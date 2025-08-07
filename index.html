@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parkinson's AU Detection</title>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+        video, canvas { border: 1px solid black; margin: 10px; }
+        select, button { margin: 10px; padding: 8px; font-size: 16px; }
+        #downloadLink { display: none; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Parkinson's Disease Facial AU Analysis</h1>
+    <label for="condition">Select Condition:</label>
+    <select id="condition">
+        <option value="healthy">Healthy</option>
+        <option value="parkinson">Parkinson's</option>
+    </select><br>
+    <button onclick="startWebcam()">Start Webcam</button>
+    <button onclick="captureAndAnalyze()" disabled id="analyzeBtn">Analyze</button><br>
+    <video id="video" width="640" height="480" autoplay></video><br>
+    <canvas id="canvas" style="display: none;"></canvas><br>
+    <a id="downloadLink" download="au_data.csv">Download CSV</a>
+
+    <script>
+        let stream;
+        let pyodide;
+
+        async function loadPyodideAndPackages() {
+            pyodide = await loadPyodide();
+            await pyodide.loadPackage("numpy");
+            await pyodide.runPythonAsync(`
+import numpy as np
+import js
+
+def extract_mock_au_values():
+    # Simulate AU extraction (mock values for demonstration)
+    aus = {
+        'AU1': np.random.uniform(0, 0.5 if js.document.getElementById('condition').value == 'parkinson' else 1),
+        'AU2': np.random.uniform(0, 0.4 if js.document.getElementById('condition').value == 'parkinson' else 1),
+        'AU4': np.random.uniform(0, 0.3 if js.document.getElementById('condition').value == 'parkinson' else 1),
+        'AU6': np.random.uniform(0, 0.2 if js.document.getElementById('condition').value == 'parkinson' else 1),
+        'AU7': np.random.uniform(0, 0.5 if js.document.getElementById('condition').value == 'parkinson' else 1),
+        'AU9': np.random.uniform(0, 0.1 if js.document.getElementById('condition').value == 'parkinson' else 1),
+        'AU10': np.random.uniform(0, 0.3 if js.document.getElementById('condition').value == 'parkinson' else 1),
+        'AU12': np.random.uniform(0, 0.2 if js.document.getElementById('condition').value == 'parkinson' else 1),
+        'AU14': np.random.uniform(0, 0.2 if js.document.getElementById('condition').value == 'parkinson' else 1),
+        'AU15': np.random.uniform(0, 0.6 if js.document.getElementById('condition').value == 'parkinson' else 1),
+        'AU17': np.random.uniform(0, 0.3 if js.document.getElementById('condition').value == 'parkinson' else 1),
+        'AU20': np.random.uniform(0, 0.7 if js.document.getElementById('condition').value == 'parkinson' else 1),
+        'AU23': np.random.uniform(0, 0.8 if js.document.getElementById('condition').value == 'parkinson' else 1),
+        'AU25': np.random.uniform(0, 0.4 if js.document.getElementById('condition').value == 'parkinson' else 1),
+        'AU26': np.random.uniform(0, 0.3 if js.document.getElementById('condition').value == 'parkinson' else 1),
+        'AU45': np.random.uniform(0, 0.5 if js.document.getElementById('condition').value == 'parkinson' else 1)
+    }
+    return aus
+
+def save_to_csv(condition, au_values):
+    header = 'condition,' + ','.join(au_values.keys())
+    values = f"{condition}," + ','.join([str(v) for v in au_values.values()])
+    csv_content = header + '\\n' + values
+    blob = js.Blob.new([csv_content], {'type': 'text/csv'})
+    url = js.URL.createObjectURL(blob)
+    js.document.getElementById('downloadLink').href = url
+    js.document.getElementById('downloadLink').style.display = 'block'
+            `);
+        }
+
+        async function startWebcam() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+                video.onloadedmetadata = () => {
+                    document.getElementById('analyzeBtn').disabled = false;
+                };
+            } catch (err) {
+                alert('Error accessing webcam: ' + err);
+            }
+        }
+
+        async function captureAndAnalyze() {
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            // Simulate AU extraction
+            const condition = document.getElementById('condition').value;
+            // Get AU values as a Python dict in Pyodide
+            await pyodide.runPythonAsync('au_values = extract_mock_au_values()');
+            // Set the condition as a Python variable
+            await pyodide.runPythonAsync(`condition_js = '${condition}'`);
+            // Call save_to_csv with variables in Pyodide's global scope
+            await pyodide.runPythonAsync('save_to_csv(condition_js, au_values)');
+            alert('Analysis complete! Click to download CSV.');
+        }
+
+        // Stop webcam when page unloads
+        window.onunload = () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        };
+
+        // Load Pyodide on page load
+        loadPyodideAndPackages();
+    </script>
+</body>
+</html>
