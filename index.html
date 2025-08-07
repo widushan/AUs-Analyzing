@@ -33,39 +33,39 @@
             pyodide = await loadPyodide();
             await pyodide.loadPackage("numpy");
             await pyodide.runPythonAsync(`
-import numpy as np
-import js
+                import numpy as np
+                import js
 
-def extract_mock_au_values():
-    # Simulate AU extraction (mock values for demonstration)
-    aus = {
-        'AU1': np.random.uniform(0, 0.5 if js.document.getElementById('condition').value == 'parkinson' else 1),
-        'AU2': np.random.uniform(0, 0.4 if js.document.getElementById('condition').value == 'parkinson' else 1),
-        'AU4': np.random.uniform(0, 0.3 if js.document.getElementById('condition').value == 'parkinson' else 1),
-        'AU6': np.random.uniform(0, 0.2 if js.document.getElementById('condition').value == 'parkinson' else 1),
-        'AU7': np.random.uniform(0, 0.5 if js.document.getElementById('condition').value == 'parkinson' else 1),
-        'AU9': np.random.uniform(0, 0.1 if js.document.getElementById('condition').value == 'parkinson' else 1),
-        'AU10': np.random.uniform(0, 0.3 if js.document.getElementById('condition').value == 'parkinson' else 1),
-        'AU12': np.random.uniform(0, 0.2 if js.document.getElementById('condition').value == 'parkinson' else 1),
-        'AU14': np.random.uniform(0, 0.2 if js.document.getElementById('condition').value == 'parkinson' else 1),
-        'AU15': np.random.uniform(0, 0.6 if js.document.getElementById('condition').value == 'parkinson' else 1),
-        'AU17': np.random.uniform(0, 0.3 if js.document.getElementById('condition').value == 'parkinson' else 1),
-        'AU20': np.random.uniform(0, 0.7 if js.document.getElementById('condition').value == 'parkinson' else 1),
-        'AU23': np.random.uniform(0, 0.8 if js.document.getElementById('condition').value == 'parkinson' else 1),
-        'AU25': np.random.uniform(0, 0.4 if js.document.getElementById('condition').value == 'parkinson' else 1),
-        'AU26': np.random.uniform(0, 0.3 if js.document.getElementById('condition').value == 'parkinson' else 1),
-        'AU45': np.random.uniform(0, 0.5 if js.document.getElementById('condition').value == 'parkinson' else 1)
-    }
-    return aus
+                def extract_mock_au_values():
+                    # Simulate AU extraction (mock values for demonstration)
+                    aus = {
+                        'AU1': np.random.uniform(0, 0.5 if js.document.getElementById('condition').value == 'parkinson' else 1),
+                        'AU2': np.random.uniform(0, 0.4 if js.document.getElementById('condition').value == 'parkinson' else 1),
+                        'AU4': np.random.uniform(0, 0.3 if js.document.getElementById('condition').value == 'parkinson' else 1),
+                        'AU6': np.random.uniform(0, 0.2 if js.document.getElementById('condition').value == 'parkinson' else 1),
+                        'AU7': np.random.uniform(0, 0.5 if js.document.getElementById('condition').value == 'parkinson' else 1),
+                        'AU9': np.random.uniform(0, 0.1 if js.document.getElementById('condition').value == 'parkinson' else 1),
+                        'AU10': np.random.uniform(0, 0.3 if js.document.getElementById('condition').value == 'parkinson' else 1),
+                        'AU12': np.random.uniform(0, 0.2 if js.document.getElementById('condition').value == 'parkinson' else 1),
+                        'AU14': np.random.uniform(0, 0.2 if js.document.getElementById('condition').value == 'parkinson' else 1),
+                        'AU15': np.random.uniform(0, 0.6 if js.document.getElementById('condition').value == 'parkinson' else 1),
+                        'AU17': np.random.uniform(0, 0.3 if js.document.getElementById('condition').value == 'parkinson' else 1),
+                        'AU20': np.random.uniform(0, 0.7 if js.document.getElementById('condition').value == 'parkinson' else 1),
+                        'AU23': np.random.uniform(0, 0.8 if js.document.getElementById('condition').value == 'parkinson' else 1),
+                        'AU25': np.random.uniform(0, 0.4 if js.document.getElementById('condition').value == 'parkinson' else 1),
+                        'AU26': np.random.uniform(0, 0.3 if js.document.getElementById('condition').value == 'parkinson' else 1),
+                        'AU45': np.random.uniform(0, 0.5 if js.document.getElementById('condition').value == 'parkinson' else 1)
+                    }
+                    return aus
 
-def save_to_csv(condition, au_values):
-    header = 'condition,' + ','.join(au_values.keys())
-    values = f"{condition}," + ','.join([str(v) for v in au_values.values()])
-    csv_content = header + '\\n' + values
-    blob = js.Blob.new([csv_content], {'type': 'text/csv'})
-    url = js.URL.createObjectURL(blob)
-    js.document.getElementById('downloadLink').href = url
-    js.document.getElementById('downloadLink').style.display = 'block'
+                def save_to_csv(condition, au_values):
+                    header = 'condition,' + ','.join(au_values.keys())
+                    values = f"{condition}," + ','.join([str(v) for v in au_values.values()])
+                    csv_content = header + '\\n' + values
+                    blob = js.Blob.new([csv_content], {'type': 'text/csv'})
+                    url = js.URL.createObjectURL(blob)
+                    js.document.getElementById('downloadLink').href = url
+                    js.document.getElementById('downloadLink').style.display = 'block'
             `);
         }
 
