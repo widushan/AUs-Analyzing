@@ -14,6 +14,7 @@
     .au-item { display:flex; justify-content:space-between; padding:4px 6px; border-bottom:1px solid #eee; }
     .au-item:last-child{border-bottom:0;}
     .good { color:green } .low { color:orange } .verylow { color:crimson }
+    #countdown { font-size: 48px; font-weight: bold; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #ff5722; z-index: 10; }
   </style>
   <!-- Correct MediaPipe imports -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
@@ -35,6 +36,7 @@
 
     <video id="video" autoplay playsinline style="width: 640px; height: 480px;"></video>
     <canvas id="overlay" width="640" height="480" style="position:relative; top:-480px; left:0;"></canvas>
+    <div id="countdown"></div>
 
     <div id="info">
       <small>Green lines show AU measurement points. Labels show AU numbers in real time.</small>
@@ -112,12 +114,11 @@
   const stopBtn = document.getElementById('stopBtn');
   const facing = document.getElementById('facing');
   const downloadBtn = document.getElementById('download');
+  const countdownDiv = document.getElementById('countdown');
 
   let camera = null, faceMesh = null, lastAUs = null, csvRows = [], samplingInterval = null;
   let mediaRecorder, recordedChunks = [];
   let sessionTimestamp = '';
-
-
 
   faceMesh = new FaceMesh({
     locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
@@ -213,21 +214,38 @@
     });
   }
 
-
-
-
-
-  startBtn.onclick = async () => {
-    startBtn.disabled = true; 
+  startBtn.onclick = function() {
+    startBtn.disabled = true;
     stopBtn.disabled = false;
 
+    let count = 3;
+    countdownDiv.textContent = count;
+
+    const countdownInterval = setInterval(() => {
+      count--;
+      if (count > 0) {
+        countdownDiv.textContent = count;
+      } else if (count === 0) {
+        countdownDiv.textContent = "Start!";
+      } else {
+        clearInterval(countdownInterval);
+        countdownDiv.textContent = "";
+        
+        // Start recording after countdown
+        startRecording();
+      }
+    }, 1000);
+  };
+
+  // Separate the async recording function
+  async function startRecording() {
     // Create a timestamp for both files
     sessionTimestamp = new Date().toISOString().replace(/[:.]/g, '-');
 
     // Request video + audio
     const constraints = { 
-        video: { width: 640, height: 480, facingMode: facing.value },
-        audio: true
+      video: { width: 640, height: 480, facingMode: facing.value },
+      audio: true
     };
 
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -240,25 +258,25 @@
     mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
 
     mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) recordedChunks.push(e.data);
+      if (e.data.size > 0) recordedChunks.push(e.data);
     };
 
     mediaRecorder.onstop = () => {
-        const blob = new Blob(recordedChunks, { type: 'video/webm' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `session_${sessionTimestamp}.webm`;
-        a.click();
-        URL.revokeObjectURL(url);
+      const blob = new Blob(recordedChunks, { type: 'video/webm' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `session_${sessionTimestamp}.webm`;
+      a.click();
+      URL.revokeObjectURL(url);
     };
 
     mediaRecorder.start();
 
     // Start the AU tracking camera
     camera = new Camera(video, { 
-        onFrame: async () => { await faceMesh.send({image: video}); }, 
-        width: 640, height: 480 
+      onFrame: async () => { await faceMesh.send({image: video}); }, 
+      width: 640, height: 480 
     });
     camera.start();
 
@@ -267,50 +285,46 @@
     csvRows = [auOrder.join(',')];
 
     samplingInterval = setInterval(()=> {
-        if (lastAUs){
+      if (lastAUs){
         csvRows.push([
-            new Date().toISOString(), 
-            ...auOrder.slice(1).map(k => lastAUs[k]?.toFixed(3) ?? '0.000')
+          new Date().toISOString(), 
+          ...auOrder.slice(1).map(k => lastAUs[k]?.toFixed(3) ?? '0.000')
         ].join(','));
-        }
+      }
     }, 500);
-  };
-
-
-
+  }
 
   stopBtn.onclick = () => {
-    startBtn.disabled = false; 
+    if (camera) {
+      camera.stop();
+      camera = null;
+    }
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+    }
+    if (samplingInterval) {
+      clearInterval(samplingInterval);
+      samplingInterval = null;
+    }
+    if (video.srcObject) {
+      video.srcObject.getTracks().forEach(track => track.stop());
+      video.srcObject = null;
+    }
+    startBtn.disabled = false;
     stopBtn.disabled = true;
-
-    if (camera) camera.stop();
-    if (video.srcObject){ 
-        video.srcObject.getTracks().forEach(t=>t.stop()); 
-        video.srcObject = null; 
-    }
-    clearInterval(samplingInterval);
-
-    // Stop the video+audio recorder
-    if (mediaRecorder && mediaRecorder.state !== "inactive") {
-        mediaRecorder.stop();
-    }
-
-    // Save CSV with matching timestamp
-    if (csvRows.length > 1) {
-        const blob = new Blob([csvRows.join('\n')], {type:'text/csv'});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `session_${sessionTimestamp}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
-    }
   };
 
-
-
-
-
+  downloadBtn.onclick = () => {
+    if (csvRows.length > 1) {
+      const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `au_data_${sessionTimestamp}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  };
 })();
 </script>
 </body>
