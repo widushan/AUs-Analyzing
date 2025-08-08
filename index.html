@@ -71,37 +71,60 @@
     const L = (i)=>({x: landmarks[i].x, y: landmarks[i].y});
     const iod = dist(L(idx.leftEyeOuter), L(idx.rightEyeOuter)) || 1;
 
-    const au1 = -((L(idx.leftInnerBrow).y - meanPoint([L(idx.leftUpperEyelid), L(idx.leftLowerEyelid)]).y +
-                   L(idx.rightInnerBrow).y - meanPoint([L(idx.rightUpperEyelid), L(idx.rightLowerEyelid)]).y) / 2) / iod;
-    const au2 = -((L(idx.leftOuterBrow).y - L(idx.leftUpperEyelid).y +
-                   L(idx.rightOuterBrow).y - L(idx.rightUpperEyelid).y) / 2) / iod;
-    const au4 = ((L(idx.leftInnerBrow).y + L(idx.rightInnerBrow).y)/2 - 
-                 (L(idx.leftUpperEyelid).y + L(idx.rightUpperEyelid).y)/2) / iod;
+    const au1_left = -(L(idx.leftInnerBrow).y - meanPoint([L(idx.leftUpperEyelid), L(idx.leftLowerEyelid)]).y) / iod;
+    const au1_right = -(L(idx.rightInnerBrow).y - meanPoint([L(idx.rightUpperEyelid), L(idx.rightLowerEyelid)]).y) / iod;
+    const au2_left = -(L(idx.leftOuterBrow).y - L(idx.leftUpperEyelid).y) / iod;
+    const au2_right = -(L(idx.rightOuterBrow).y - L(idx.rightUpperEyelid).y) / iod;
+    const au4_left = (L(idx.leftInnerBrow).y - L(idx.leftUpperEyelid).y) / iod;
+    const au4_right = (L(idx.rightInnerBrow).y - L(idx.rightUpperEyelid).y) / iod;
     const leftGap = L(idx.leftUpperEyelid).y - L(idx.leftLowerEyelid).y;
     const rightGap = L(idx.rightUpperEyelid).y - L(idx.rightLowerEyelid).y;
-    const au6 = -( (leftGap + rightGap) / 2 ) / iod;
-    const au7 = Math.max(0, au6*1.2);
-    const au9 = -(L(idx.noseTip).y - L(idx.upperLip).y) / iod;
-    const au10 = au9 * 0.9;
+    const au6_left = -leftGap / iod;
+    const au6_right = -rightGap / iod;
+    const au7_left = Math.max(0, au6_left * 1.2);
+    const au7_right = Math.max(0, au6_right * 1.2);
     const mouthWidth = dist(L(idx.mouthLeft), L(idx.mouthRight));
-    const au12 = mouthWidth / iod;
+    const au12_left = (L(idx.mouthRight).x - L(idx.noseTip).x) / iod;
+    const au12_right = (L(idx.noseTip).x - L(idx.mouthLeft).x) / iod;
     const lipHeight = Math.abs(L(idx.upperLip).y - L(idx.lowerLip).y) || 1e-6;
-    const au14 = (mouthWidth / lipHeight) / 10;
+    const au14_left = (mouthWidth / lipHeight) / 10;
+    const au14_right = au14_left;
     const mouthMidY = (L(idx.mouthLeft).y + L(idx.mouthRight).y) / 2;
-    const au15 = (( (L(idx.mouthLeft).y - mouthMidY) + (L(idx.mouthRight).y - mouthMidY) )/2) / iod;
-    const au17 = -( (L(idx.lowerLip).y - L(idx.chinLower).y) / iod );
-    const au20 = mouthWidth / iod;
-    const au23 = 1 - (lipHeight*2 / iod);
-    const au25 = Math.abs(L(idx.upperLip).y - L(idx.lowerLip).y) / iod;
-    const au26 = Math.abs(L(idx.jawPoint).y - L(idx.chinLower).y) / iod;
-    const au45 = (leftGap + rightGap) / (2*iod);
+    const au15_left = (L(idx.mouthLeft).y - mouthMidY) / iod;
+    const au15_right = (L(idx.mouthRight).y - mouthMidY) / iod;
+    const au17_left = (L(idx.lowerLip).y - L(idx.chinLower).y) / iod;
+    const au17_right = au17_left;
+    const au45_left = (L(idx.leftUpperEyelid).y - L(idx.leftLowerEyelid).y) / iod;
+    const au45_right = (L(idx.rightUpperEyelid).y - L(idx.rightLowerEyelid).y) / iod;
 
-    return { AU1: clampNormalized(au1), AU2: clampNormalized(au2), AU4: clampNormalized(au4),
-             AU6: clampNormalized(au6), AU7: clampNormalized(au7), AU9: clampNormalized(au9),
-             AU10: clampNormalized(au10), AU12: clampNormalized(au12), AU14: clampNormalized(au14),
-             AU15: clampNormalized(au15), AU17: clampNormalized(au17), AU20: clampNormalized(au20),
-             AU23: clampNormalized(au23), AU25: clampNormalized(au25), AU26: clampNormalized(au26),
-             AU45: clampNormalized(au45), iod: iod };
+    const result = {};
+    function addAU(name, left, right){
+      const avg = (left + right) / 2;
+      const asym = Math.abs(left - right);
+      result[name] = clampNormalized(avg);
+      result[name + '_asym'] = clampNormalized(asym);
+    }
+
+    addAU('AU1', au1_left, au1_right);
+    addAU('AU2', au2_left, au2_right);
+    addAU('AU4', au4_left, au4_right);
+    addAU('AU6', au6_left, au6_right);
+    addAU('AU7', au7_left, au7_right);
+    addAU('AU12', au12_left, au12_right);
+    addAU('AU14', au14_left, au14_right);
+    addAU('AU15', au15_left, au15_right);
+    addAU('AU17', au17_left, au17_right);
+    addAU('AU45', au45_left, au45_right);
+
+    result['asymmetry_total'] = clampNormalized(
+      result['AU1_asym'] + result['AU2_asym'] + result['AU4_asym'] +
+      result['AU6_asym'] + result['AU7_asym'] + result['AU12_asym'] +
+      result['AU14_asym'] + result['AU15_asym'] + result['AU17_asym'] +
+      result['AU45_asym']
+    );
+
+    result['iod'] = iod;
+    return result;
   }
 
   const video = document.getElementById('video');
@@ -149,22 +172,46 @@
     lastAUs = computeAUs(lm);
 
     // Simple 1–2 lines per AU
-    drawLine(idx.leftInnerBrow, idx.leftUpperEyelid, lm, "AU1");
-    drawLine(idx.leftOuterBrow, idx.leftUpperEyelid, lm, "AU2");
-    drawLine(idx.leftInnerBrow, idx.leftLowerEyelid, lm, "AU4");
-    drawLine(idx.leftLowerEyelid, idx.leftUpperEyelid, lm, "AU6");
-    drawLine(idx.rightLowerEyelid, idx.rightUpperEyelid, lm, "AU7");
+    
+    // AU1
+    drawLine(idx.leftInnerBrow, idx.leftUpperEyelid, lm, "AU1(L)");
+    drawLine(idx.rightInnerBrow, idx.rightUpperEyelid, lm, "AU1(R)");
+    // AU2
+    drawLine(idx.leftOuterBrow, idx.leftUpperEyelid, lm, "AU2(L)");
+    drawLine(idx.rightOuterBrow, idx.rightUpperEyelid, lm, "AU2(R)");
+    // AU4
+    drawLine(idx.leftInnerBrow, idx.leftLowerEyelid, lm, "AU4(L)");
+    drawLine(idx.rightInnerBrow, idx.rightLowerEyelid, lm, "AU4(R)");
+    // AU6
+    drawLine(idx.leftUpperEyelid, idx.leftLowerEyelid, lm, "AU6(L)");
+    drawLine(idx.rightUpperEyelid, idx.rightLowerEyelid, lm, "AU6(R)");
+    // AU7
+    drawLine(idx.leftLowerEyelid, idx.leftUpperEyelid, lm, "AU7(L)");
+    drawLine(idx.rightLowerEyelid, idx.rightUpperEyelid, lm, "AU7(R)");
+    // AU9 and AU10 (center features)
     drawLine(idx.noseBridge, idx.upperLip, lm, "AU9");
     drawLine(idx.noseTip, idx.upperLip, lm, "AU10");
-    drawLine(idx.mouthLeft, idx.mouthRight, lm, "AU12");
-    drawLine(idx.mouthLeft, idx.upperLip, lm, "AU14");
-    drawLine(idx.mouthLeft, idx.lowerLip, lm, "AU15");
+    // AU12
+    drawLine(idx.mouthLeft, idx.noseTip, lm, "AU12(L)");
+    drawLine(idx.mouthRight, idx.noseTip, lm, "AU12(R)");
+    // AU14
+    drawLine(idx.mouthLeft, idx.upperLip, lm, "AU14(L)");
+    drawLine(idx.mouthRight, idx.upperLip, lm, "AU14(R)");
+    // AU15
+    drawLine(idx.mouthLeft, idx.lowerLip, lm, "AU15(L)");
+    drawLine(idx.mouthRight, idx.lowerLip, lm, "AU15(R)");
+    // AU17
     drawLine(idx.lowerLip, idx.chinLower, lm, "AU17");
+    // AU20
     drawLine(idx.mouthLeft, idx.mouthRight, lm, "AU20");
-    drawLine(idx.upperLip, idx.lowerLip, lm, "AU23");
-    drawLine(idx.upperLip, idx.lowerLip, lm, "AU25");
+    // AU23 and AU25
+    drawLine(idx.upperLip, idx.lowerLip, lm, "AU23/AU25");
+    // AU26
     drawLine(idx.jawPoint, idx.chinLower, lm, "AU26");
-    drawLine(idx.leftUpperEyelid, idx.leftLowerEyelid, lm, "AU45");
+    // AU45
+    drawLine(idx.leftUpperEyelid, idx.leftLowerEyelid, lm, "AU45(L)");
+    drawLine(idx.rightUpperEyelid, idx.rightLowerEyelid, lm, "AU45(R)");
+    
 
     renderAUList(lastAUs);
   }
@@ -194,7 +241,7 @@
     await video.play();
     camera = new Camera(video, { onFrame: async () => { await faceMesh.send({image: video}); }, width: 640, height: 480 });
     camera.start();
-    csvRows = [['timestamp',...Object.keys(lastAUs||{})].join(',')];
+    csvRows = [['timestamp,AU1,AU1_asym,AU2,AU2_asym,AU4,AU4_asym,AU6,AU6_asym,AU7,AU7_asym,AU12,AU12_asym,AU14,AU14_asym,AU15,AU15_asym,AU17,AU17_asym,AU45,AU45_asym,asymmetry_total'].join(',')];
     samplingInterval = setInterval(()=> {
       if (lastAUs){
         csvRows.push([new Date().toISOString(), ...Object.values(lastAUs).map(v=>v.toFixed(3))].join(','));
