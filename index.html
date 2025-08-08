@@ -114,6 +114,9 @@
   const downloadBtn = document.getElementById('download');
 
   let camera = null, faceMesh = null, lastAUs = null, csvRows = [], samplingInterval = null;
+  let mediaRecorder;
+  let recordedChunks = [];
+
 
   faceMesh = new FaceMesh({
     locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
@@ -214,9 +217,31 @@
     stopBtn.disabled = false;
 
     const constraints = { video: { width: 640, height: 480, facingMode: facing.value } };
+
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     video.srcObject = stream;
     await video.play();
+
+    // Set up MediaRecorder for raw video
+    recordedChunks = [];
+    mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+
+    mediaRecorder.ondataavailable = (e) => {
+    if (e.data.size > 0) recordedChunks.push(e.data);
+    };
+
+    mediaRecorder.onstop = () => {
+    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'session_video.webm';
+    a.click();
+    URL.revokeObjectURL(url);
+    };
+
+    mediaRecorder.start();
+
 
     camera = new Camera(video, { 
         onFrame: async () => { 
@@ -226,6 +251,7 @@
         height: 480 
     });
     camera.start();
+
 
     // Explicit AU order for CSV headings
     const auOrder = ['timestamp','AU1','AU2','AU4','AU6','AU7','AU9','AU10','AU12','AU14','AU15','AU17','AU20','AU23','AU25','AU26','AU45','iod'];
@@ -244,6 +270,11 @@
 
   stopBtn.onclick = () => {
     startBtn.disabled = false; stopBtn.disabled = true;
+    
+    if (mediaRecorder && mediaRecorder.state !== "inactive") {
+    mediaRecorder.stop();
+    }
+
     if (camera) camera.stop();
     if (video.srcObject){ video.srcObject.getTracks().forEach(t=>t.stop()); video.srcObject = null; }
     clearInterval(samplingInterval);
