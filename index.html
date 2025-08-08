@@ -210,20 +210,37 @@
   }
 
   startBtn.onclick = async () => {
-    startBtn.disabled = true; stopBtn.disabled = false;
+    startBtn.disabled = true; 
+    stopBtn.disabled = false;
+
     const constraints = { video: { width: 640, height: 480, facingMode: facing.value } };
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     video.srcObject = stream;
     await video.play();
-    camera = new Camera(video, { onFrame: async () => { await faceMesh.send({image: video}); }, width: 640, height: 480 });
+
+    camera = new Camera(video, { 
+        onFrame: async () => { 
+        await faceMesh.send({image: video}); 
+        }, 
+        width: 640, 
+        height: 480 
+    });
     camera.start();
-    csvRows = [['timestamp',...Object.keys(lastAUs||{})].join(',')];
+
+    // Explicit AU order for CSV headings
+    const auOrder = ['timestamp','AU1','AU2','AU4','AU6','AU7','AU9','AU10','AU12','AU14','AU15','AU17','AU20','AU23','AU25','AU26','AU45','iod'];
+    csvRows = [auOrder.join(',')];
+
     samplingInterval = setInterval(()=> {
-      if (lastAUs){
-        csvRows.push([new Date().toISOString(), ...Object.values(lastAUs).map(v=>v.toFixed(3))].join(','));
-      }
+        if (lastAUs){
+        csvRows.push([
+            new Date().toISOString(), 
+            ...auOrder.slice(1).map(k => lastAUs[k]?.toFixed(3) ?? '0.000')
+        ].join(','));
+        }
     }, 500);
-  };
+    };
+
 
   stopBtn.onclick = () => {
     startBtn.disabled = false; stopBtn.disabled = true;
