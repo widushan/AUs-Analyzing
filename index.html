@@ -1,113 +1,222 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Parkinson's AU Detection</title>
-    <script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
-    <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
-        video, canvas { border: 1px solid black; margin: 10px; }
-        select, button { margin: 10px; padding: 8px; font-size: 16px; }
-        #downloadLink { display: none; margin-top: 10px; }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Browser AU Detector — Rule-based</title>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; display:flex; gap:20px; padding:20px; }
+    .panel { max-width:760px; }
+    video, canvas { display:block; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,0.12); }
+    #controls { margin-bottom:10px; }
+    #info { margin-top:10px; }
+    .au-list { max-height:320px; overflow:auto; padding:8px; border-radius:6px; background:#f7f7f7; }
+    .au-item { display:flex; justify-content:space-between; padding:4px 6px; border-bottom:1px solid #eee; }
+    .au-item:last-child{border-bottom:0;}
+    .good { color:green } .low { color:orange } .verylow { color:crimson }
+  </style>
+  <!-- Correct MediaPipe imports -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
 </head>
 <body>
-    <h1>Parkinson's Disease Facial AU Analysis</h1>
-    <label for="condition">Select Condition:</label>
-    <select id="condition">
-        <option value="healthy">Healthy</option>
-        <option value="parkinson">Parkinson's</option>
-    </select><br>
-    <button onclick="startWebcam()">Start Webcam</button>
-    <button onclick="captureAndAnalyze()" disabled id="analyzeBtn">Analyze</button><br>
-    <video id="video" width="640" height="480" autoplay></video><br>
-    <canvas id="canvas" style="display: none;"></canvas><br>
-    <a id="downloadLink" download="au_data.csv">Download CSV</a>
+  <div class="panel">
+    <h2>Browser AU Detector</h2>
+    <div id="controls">
+      <label for="facing">user</label>
+      <select id="facing">
+        <option value="user">Healthy</option>
+        <option value="user">Parkinson</option>
+      </select>
+      <button id="startBtn">Start</button>
+      <button id="stopBtn" disabled>Stop</button>
+    </div>
 
-    <script>
-        let stream;
-        let pyodide;
+    <video id="video" autoplay playsinline style="width: 640px; height: 480px;"></video>
+    <canvas id="overlay" width="640" height="480" style="position:relative; top:-480px; left:0;"></canvas>
 
-        async function loadPyodideAndPackages() {
-            pyodide = await loadPyodide();
-            await pyodide.loadPackage("numpy");
-            await pyodide.runPythonAsync(`
-                import numpy as np
-                import js
+    <div id="info">
+      <small>Green lines show AU measurement points. Labels show AU numbers in real time.</small>
+    </div>
+  </div>
 
-                def extract_mock_au_values():
-                    # Simulate AU extraction (mock values for demonstration)
-                    aus = {
-                        'AU1': np.random.uniform(0, 0.5 if js.document.getElementById('condition').value == 'parkinson' else 1),
-                        'AU2': np.random.uniform(0, 0.4 if js.document.getElementById('condition').value == 'parkinson' else 1),
-                        'AU4': np.random.uniform(0, 0.3 if js.document.getElementById('condition').value == 'parkinson' else 1),
-                        'AU6': np.random.uniform(0, 0.2 if js.document.getElementById('condition').value == 'parkinson' else 1),
-                        'AU7': np.random.uniform(0, 0.5 if js.document.getElementById('condition').value == 'parkinson' else 1),
-                        'AU9': np.random.uniform(0, 0.1 if js.document.getElementById('condition').value == 'parkinson' else 1),
-                        'AU10': np.random.uniform(0, 0.3 if js.document.getElementById('condition').value == 'parkinson' else 1),
-                        'AU12': np.random.uniform(0, 0.2 if js.document.getElementById('condition').value == 'parkinson' else 1),
-                        'AU14': np.random.uniform(0, 0.2 if js.document.getElementById('condition').value == 'parkinson' else 1),
-                        'AU15': np.random.uniform(0, 0.6 if js.document.getElementById('condition').value == 'parkinson' else 1),
-                        'AU17': np.random.uniform(0, 0.3 if js.document.getElementById('condition').value == 'parkinson' else 1),
-                        'AU20': np.random.uniform(0, 0.7 if js.document.getElementById('condition').value == 'parkinson' else 1),
-                        'AU23': np.random.uniform(0, 0.8 if js.document.getElementById('condition').value == 'parkinson' else 1),
-                        'AU25': np.random.uniform(0, 0.4 if js.document.getElementById('condition').value == 'parkinson' else 1),
-                        'AU26': np.random.uniform(0, 0.3 if js.document.getElementById('condition').value == 'parkinson' else 1),
-                        'AU45': np.random.uniform(0, 0.5 if js.document.getElementById('condition').value == 'parkinson' else 1)
-                    }
-                    return aus
+  <div style="width:320px">
+    <h3>AU Values</h3>
+    <div class="au-list" id="auList"></div>
+    <div style="margin-top:10px;">
+      <button id="download">Download CSV</button>
+    </div>
+  </div>
 
-                def save_to_csv(condition, au_values):
-                    header = 'condition,' + ','.join(au_values.keys())
-                    values = f"{condition}," + ','.join([str(v) for v in au_values.values()])
-                    csv_content = header + '\\n' + values
-                    blob = js.Blob.new([csv_content], {'type': 'text/csv'})
-                    url = js.URL.createObjectURL(blob)
-                    js.document.getElementById('downloadLink').href = url
-                    js.document.getElementById('downloadLink').style.display = 'block'
-            `);
-        }
+<script>
+(async () => {
+  function dist(a,b){ const dx=a.x-b.x, dy=a.y-b.y; return Math.hypot(dx,dy); }
+  function meanPoint(pts){ return {x: pts.reduce((s,p)=>s+p.x,0)/pts.length, y: pts.reduce((s,p)=>s+p.y,0)/pts.length}; }
+  function clampNormalized(x){ if (!isFinite(x)) return 0; return Math.max(0, Math.min(1, x + 0.5)); }
 
-        async function startWebcam() {
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                const video = document.getElementById('video');
-                video.srcObject = stream;
-                video.onloadedmetadata = () => {
-                    document.getElementById('analyzeBtn').disabled = false;
-                };
-            } catch (err) {
-                alert('Error accessing webcam: ' + err);
-            }
-        }
+  const idx = {
+    leftEyeOuter: 33, rightEyeOuter: 263,
+    leftUpperEyelid: 159, leftLowerEyelid: 145,
+    rightUpperEyelid: 386, rightLowerEyelid: 374,
+    leftInnerBrow: 70, leftOuterBrow: 105,
+    rightInnerBrow: 300, rightOuterBrow: 334,
+    mouthLeft: 61, mouthRight: 291,
+    upperLip: 13, lowerLip: 14,
+    chinLower: 152, jawPoint: 17,
+    noseTip: 1, noseBridge: 6
+  };
 
-        async function captureAndAnalyze() {
-            const video = document.getElementById('video');
-            const canvas = document.getElementById('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            canvas.getContext('2d').drawImage(video, 0, 0);
-            // Simulate AU extraction
-            const condition = document.getElementById('condition').value;
-            // Get AU values as a Python dict in Pyodide
-            await pyodide.runPythonAsync('au_values = extract_mock_au_values()');
-            // Set the condition as a Python variable
-            await pyodide.runPythonAsync(`condition_js = '${condition}'`);
-            // Call save_to_csv with variables in Pyodide's global scope
-            await pyodide.runPythonAsync('save_to_csv(condition_js, au_values)');
-            alert('Analysis complete! Click to download CSV.');
-        }
+  function computeAUs(landmarks){
+    const L = (i)=>({x: landmarks[i].x, y: landmarks[i].y});
+    const iod = dist(L(idx.leftEyeOuter), L(idx.rightEyeOuter)) || 1;
 
-        // Stop webcam when page unloads
-        window.onunload = () => {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
-        };
+    const au1 = -((L(idx.leftInnerBrow).y - meanPoint([L(idx.leftUpperEyelid), L(idx.leftLowerEyelid)]).y +
+                   L(idx.rightInnerBrow).y - meanPoint([L(idx.rightUpperEyelid), L(idx.rightLowerEyelid)]).y) / 2) / iod;
+    const au2 = -((L(idx.leftOuterBrow).y - L(idx.leftUpperEyelid).y +
+                   L(idx.rightOuterBrow).y - L(idx.rightUpperEyelid).y) / 2) / iod;
+    const au4 = ((L(idx.leftInnerBrow).y + L(idx.rightInnerBrow).y)/2 - 
+                 (L(idx.leftUpperEyelid).y + L(idx.rightUpperEyelid).y)/2) / iod;
+    const leftGap = L(idx.leftUpperEyelid).y - L(idx.leftLowerEyelid).y;
+    const rightGap = L(idx.rightUpperEyelid).y - L(idx.rightLowerEyelid).y;
+    const au6 = -( (leftGap + rightGap) / 2 ) / iod;
+    const au7 = Math.max(0, au6*1.2);
+    const au9 = -(L(idx.noseTip).y - L(idx.upperLip).y) / iod;
+    const au10 = au9 * 0.9;
+    const mouthWidth = dist(L(idx.mouthLeft), L(idx.mouthRight));
+    const au12 = mouthWidth / iod;
+    const lipHeight = Math.abs(L(idx.upperLip).y - L(idx.lowerLip).y) || 1e-6;
+    const au14 = (mouthWidth / lipHeight) / 10;
+    const mouthMidY = (L(idx.mouthLeft).y + L(idx.mouthRight).y) / 2;
+    const au15 = (( (L(idx.mouthLeft).y - mouthMidY) + (L(idx.mouthRight).y - mouthMidY) )/2) / iod;
+    const au17 = -( (L(idx.lowerLip).y - L(idx.chinLower).y) / iod );
+    const au20 = mouthWidth / iod;
+    const au23 = 1 - (lipHeight*2 / iod);
+    const au25 = Math.abs(L(idx.upperLip).y - L(idx.lowerLip).y) / iod;
+    const au26 = Math.abs(L(idx.jawPoint).y - L(idx.chinLower).y) / iod;
+    const au45 = (leftGap + rightGap) / (2*iod);
 
-        // Load Pyodide on page load
-        loadPyodideAndPackages();
-    </script>
+    return { AU1: clampNormalized(au1), AU2: clampNormalized(au2), AU4: clampNormalized(au4),
+             AU6: clampNormalized(au6), AU7: clampNormalized(au7), AU9: clampNormalized(au9),
+             AU10: clampNormalized(au10), AU12: clampNormalized(au12), AU14: clampNormalized(au14),
+             AU15: clampNormalized(au15), AU17: clampNormalized(au17), AU20: clampNormalized(au20),
+             AU23: clampNormalized(au23), AU25: clampNormalized(au25), AU26: clampNormalized(au26),
+             AU45: clampNormalized(au45), iod: iod };
+  }
+
+  const video = document.getElementById('video');
+  const overlay = document.getElementById('overlay');
+  const ctx = overlay.getContext('2d');
+  const auListDiv = document.getElementById('auList');
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const facing = document.getElementById('facing');
+  const downloadBtn = document.getElementById('download');
+
+  let camera = null, faceMesh = null, lastAUs = null, csvRows = [], samplingInterval = null;
+
+  faceMesh = new FaceMesh({
+    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+  });
+  faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.6, minTrackingConfidence: 0.5 });
+  faceMesh.onResults(onResults);
+
+  function drawLine(i, j, landmarks, label) {
+    ctx.beginPath();
+    ctx.moveTo(landmarks[i].x * overlay.width, landmarks[i].y * overlay.height);
+    ctx.lineTo(landmarks[j].x * overlay.width, landmarks[j].y * overlay.height);
+    ctx.strokeStyle = "lime";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    const midX = (landmarks[i].x + landmarks[j].x) / 2 * overlay.width;
+    const midY = (landmarks[i].y + landmarks[j].y) / 2 * overlay.height;
+    ctx.fillStyle = "black";
+    ctx.font = "14px Arial";
+    ctx.fillText(label, midX + 4, midY - 4);
+  }
+
+  function onResults(results){
+    overlay.width = video.videoWidth;
+    overlay.height = video.videoHeight;
+    ctx.clearRect(0,0,overlay.width, overlay.height);
+
+    if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
+      ctx.fillStyle = "orange";
+      ctx.fillText("No face detected", 10, 20);
+      return;
+    }
+    const lm = results.multiFaceLandmarks[0];
+    lastAUs = computeAUs(lm);
+
+    // Simple 1–2 lines per AU
+    drawLine(idx.leftInnerBrow, idx.leftUpperEyelid, lm, "AU1");
+    drawLine(idx.leftOuterBrow, idx.leftUpperEyelid, lm, "AU2");
+    drawLine(idx.leftInnerBrow, idx.leftLowerEyelid, lm, "AU4");
+    drawLine(idx.leftLowerEyelid, idx.leftUpperEyelid, lm, "AU6");
+    drawLine(idx.rightLowerEyelid, idx.rightUpperEyelid, lm, "AU7");
+    drawLine(idx.noseBridge, idx.upperLip, lm, "AU9");
+    drawLine(idx.noseTip, idx.upperLip, lm, "AU10");
+    drawLine(idx.mouthLeft, idx.mouthRight, lm, "AU12");
+    drawLine(idx.mouthLeft, idx.upperLip, lm, "AU14");
+    drawLine(idx.mouthLeft, idx.lowerLip, lm, "AU15");
+    drawLine(idx.lowerLip, idx.chinLower, lm, "AU17");
+    drawLine(idx.mouthLeft, idx.mouthRight, lm, "AU20");
+    drawLine(idx.upperLip, idx.lowerLip, lm, "AU23");
+    drawLine(idx.upperLip, idx.lowerLip, lm, "AU25");
+    drawLine(idx.jawPoint, idx.chinLower, lm, "AU26");
+    drawLine(idx.leftUpperEyelid, idx.leftLowerEyelid, lm, "AU45");
+
+    renderAUList(lastAUs);
+  }
+
+  function renderAUList(aus){
+    const order = ['AU1','AU2','AU4','AU6','AU7','AU9','AU10','AU12','AU14','AU15','AU17','AU20','AU23','AU25','AU26','AU45'];
+    auListDiv.innerHTML = '';
+    order.forEach(k=>{
+      const val = aus[k]||0;
+      const item = document.createElement('div');
+      item.className = 'au-item';
+      const name = document.createElement('div'); name.textContent = k;
+      const v = document.createElement('div'); v.textContent = val.toFixed(2);
+      if (val > 0.6) v.className = 'good';
+      else if (val > 0.3) v.className = 'low';
+      else v.className = 'verylow';
+      item.appendChild(name); item.appendChild(v);
+      auListDiv.appendChild(item);
+    });
+  }
+
+  startBtn.onclick = async () => {
+    startBtn.disabled = true; stopBtn.disabled = false;
+    const constraints = { video: { width: 640, height: 480, facingMode: facing.value } };
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    video.srcObject = stream;
+    await video.play();
+    camera = new Camera(video, { onFrame: async () => { await faceMesh.send({image: video}); }, width: 640, height: 480 });
+    camera.start();
+    csvRows = [['timestamp',...Object.keys(lastAUs||{})].join(',')];
+    samplingInterval = setInterval(()=> {
+      if (lastAUs){
+        csvRows.push([new Date().toISOString(), ...Object.values(lastAUs).map(v=>v.toFixed(3))].join(','));
+      }
+    }, 500);
+  };
+
+  stopBtn.onclick = () => {
+    startBtn.disabled = false; stopBtn.disabled = true;
+    if (camera) camera.stop();
+    if (video.srcObject){ video.srcObject.getTracks().forEach(t=>t.stop()); video.srcObject = null; }
+    clearInterval(samplingInterval);
+  };
+
+  downloadBtn.onclick = () => {
+    if (csvRows.length <= 1) return alert('No AU samples yet.');
+    const blob = new Blob([csvRows.join('\n')], {type:'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'aus_samples.csv'; a.click();
+    URL.revokeObjectURL(url);
+  };
+})();
+</script>
 </body>
 </html>
