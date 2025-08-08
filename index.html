@@ -114,8 +114,9 @@
   const downloadBtn = document.getElementById('download');
 
   let camera = null, faceMesh = null, lastAUs = null, csvRows = [], samplingInterval = null;
-  let mediaRecorder;
-  let recordedChunks = [];
+  let mediaRecorder, recordedChunks = [];
+  let sessionTimestamp = '';
+
 
 
   faceMesh = new FaceMesh({
@@ -212,48 +213,56 @@
     });
   }
 
+
+
+
+
   startBtn.onclick = async () => {
     startBtn.disabled = true; 
     stopBtn.disabled = false;
 
-    const constraints = { video: { width: 640, height: 480, facingMode: facing.value } };
+    // Create a timestamp for both files
+    sessionTimestamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+    // Request video + audio
+    const constraints = { 
+        video: { width: 640, height: 480, facingMode: facing.value },
+        audio: true
+    };
 
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     video.srcObject = stream;
+    video.muted = true; // prevent echo
     await video.play();
 
-    // Set up MediaRecorder for raw video
+    // Set up MediaRecorder for raw video+audio
     recordedChunks = [];
     mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
 
     mediaRecorder.ondataavailable = (e) => {
-    if (e.data.size > 0) recordedChunks.push(e.data);
+        if (e.data.size > 0) recordedChunks.push(e.data);
     };
 
     mediaRecorder.onstop = () => {
-    const blob = new Blob(recordedChunks, { type: 'video/webm' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'session_video.webm';
-    a.click();
-    URL.revokeObjectURL(url);
+        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `session_${sessionTimestamp}.webm`;
+        a.click();
+        URL.revokeObjectURL(url);
     };
 
     mediaRecorder.start();
 
-
+    // Start the AU tracking camera
     camera = new Camera(video, { 
-        onFrame: async () => { 
-        await faceMesh.send({image: video}); 
-        }, 
-        width: 640, 
-        height: 480 
+        onFrame: async () => { await faceMesh.send({image: video}); }, 
+        width: 640, height: 480 
     });
     camera.start();
 
-
-    // Explicit AU order for CSV headings
+    // Fixed AU column order
     const auOrder = ['timestamp','AU1','AU2','AU4','AU6','AU7','AU9','AU10','AU12','AU14','AU15','AU17','AU20','AU23','AU25','AU26','AU45','iod'];
     csvRows = [auOrder.join(',')];
 
@@ -265,28 +274,43 @@
         ].join(','));
         }
     }, 500);
-    };
+  };
+
+
 
 
   stopBtn.onclick = () => {
-    startBtn.disabled = false; stopBtn.disabled = true;
-    
-    if (mediaRecorder && mediaRecorder.state !== "inactive") {
-    mediaRecorder.stop();
-    }
+    startBtn.disabled = false; 
+    stopBtn.disabled = true;
 
     if (camera) camera.stop();
-    if (video.srcObject){ video.srcObject.getTracks().forEach(t=>t.stop()); video.srcObject = null; }
+    if (video.srcObject){ 
+        video.srcObject.getTracks().forEach(t=>t.stop()); 
+        video.srcObject = null; 
+    }
     clearInterval(samplingInterval);
+
+    // Stop the video+audio recorder
+    if (mediaRecorder && mediaRecorder.state !== "inactive") {
+        mediaRecorder.stop();
+    }
+
+    // Save CSV with matching timestamp
+    if (csvRows.length > 1) {
+        const blob = new Blob([csvRows.join('\n')], {type:'text/csv'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `session_${sessionTimestamp}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
   };
 
-  downloadBtn.onclick = () => {
-    if (csvRows.length <= 1) return alert('No AU samples yet.');
-    const blob = new Blob([csvRows.join('\n')], {type:'text/csv'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = 'aus_samples.csv'; a.click();
-    URL.revokeObjectURL(url);
-  };
+
+
+
+
 })();
 </script>
 </body>
