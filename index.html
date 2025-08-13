@@ -71,33 +71,33 @@
     };
 
     function computeAUs(landmarks){
-      const L = (i)=>({x: landmarks[i].x, y: landmarks[i].y});
-      const iod = dist(L(idx.leftEyeOuter), L(idx.rightEyeOuter)) || 1;
+      const L = (i)=>({x: landmarks[i].x, y: landmarks[i].y});    // function to extract the {x, y} coordinates of a landmark at index i from the landmarks array
+      const iod = dist(L(idx.leftEyeOuter), L(idx.rightEyeOuter)) || 1;    // Calculates the distance between the outer corners of the eyes
 
       const au1 = -((L(idx.leftInnerBrow).y - meanPoint([L(idx.leftUpperEyelid), L(idx.leftLowerEyelid)]).y +
-                    L(idx.rightInnerBrow).y - meanPoint([L(idx.rightUpperEyelid), L(idx.rightLowerEyelid)]).y) / 2) / iod;
+                    L(idx.rightInnerBrow).y - meanPoint([L(idx.rightUpperEyelid), L(idx.rightLowerEyelid)]).y) / 2) / iod;    // Quantifies how much the inner eyebrows are raised relative to the eyes.
       const au2 = -((L(idx.leftOuterBrow).y - L(idx.leftUpperEyelid).y +
-                    L(idx.rightOuterBrow).y - L(idx.rightUpperEyelid).y) / 2) / iod;
+                    L(idx.rightOuterBrow).y - L(idx.rightUpperEyelid).y) / 2) / iod;    // Captures outer eyebrow elevation, distinct from AU1.
       const au4 = ((L(idx.leftInnerBrow).y + L(idx.rightInnerBrow).y)/2 - 
-                  (L(idx.leftUpperEyelid).y + L(idx.rightUpperEyelid).y)/2) / iod;
+                  (L(idx.leftUpperEyelid).y + L(idx.rightUpperEyelid).y)/2) / iod;    // Measures downward movement of the eyebrows relative to the eyes.
       const leftGap = L(idx.leftUpperEyelid).y - L(idx.leftLowerEyelid).y;
       const rightGap = L(idx.rightUpperEyelid).y - L(idx.rightLowerEyelid).y;
-      const au6 = -( (leftGap + rightGap) / 2 ) / iod;
-      const au7 = Math.max(0, au6*1.2);
-      const au9 = -(L(idx.noseTip).y - L(idx.upperLip).y) / iod;
-      const au10 = au9 * 0.9;
+      const au6 = -( (leftGap + rightGap) / 2 ) / iod;    // Quantifies eye narrowing due to cheek movement.
+      const au7 = Math.max(0, au6*1.2);    // Approximates lid tightening based on eye gap reduction.
+      const au9 = -(L(idx.noseTip).y - L(idx.upperLip).y) / iod;    // Captures nose wrinkling by reduced nose-to-lip distance.
+      const au10 = au9 * 0.9;    // Approximates upper lip movement based on nose wrinkling.
       const mouthWidth = dist(L(idx.mouthLeft), L(idx.mouthRight));
-      const au12 = mouthWidth / iod;
+      const au12 = mouthWidth / iod;b   // Quantifies the width of a smile.
       const lipHeight = Math.abs(L(idx.upperLip).y - L(idx.lowerLip).y) || 1e-6;
-      const au14 = (mouthWidth / lipHeight) / 10;
+      const au14 = (mouthWidth / lipHeight) / 10;    // Measures the ratio of mouth width to height, indicating tightened lip corners.
       const mouthMidY = (L(idx.mouthLeft).y + L(idx.mouthRight).y) / 2;
-      const au15 = (( (L(idx.mouthLeft).y - mouthMidY) + (L(idx.mouthRight).y - mouthMidY) )/2) / iod;
-      const au17 = -( (L(idx.lowerLip).y - L(idx.chinLower).y) / iod );
-      const au20 = mouthWidth / iod;
-      const au23 = 1 - (lipHeight*2 / iod);
-      const au25 = Math.abs(L(idx.upperLip).y - L(idx.lowerLip).y) / iod;
-      const au26 = Math.abs(L(idx.jawPoint).y - L(idx.chinLower).y) / iod;
-      const au45 = (leftGap + rightGap) / (2*iod);
+      const au15 = (( (L(idx.mouthLeft).y - mouthMidY) + (L(idx.mouthRight).y - mouthMidY) )/2) / iod;  // Captures downward lip movement (though the formula may simplify, as deviations cancel out if symmetric).
+      const au17 = -( (L(idx.lowerLip).y - L(idx.chinLower).y) / iod );    // Quantifies chin upward movement.
+      const au20 = mouthWidth / iod;    // Measures horizontal lip stretching, though its redundancy with AU12 suggests possible simplification or context-specific use.
+      const au23 = 1 - (lipHeight*2 / iod);    // Quantifies reduced mouth opening.
+      const au25 = Math.abs(L(idx.upperLip).y - L(idx.lowerLip).y) / iod;    // Measures the degree of lip parting.
+      const au26 = Math.abs(L(idx.jawPoint).y - L(idx.chinLower).y) / iod;    // Quantifies jaw opening.
+      const au45 = (leftGap + rightGap) / (2*iod);    // Measures eye closure.
 
       return { AU1: clampNormalized(au1), AU2: clampNormalized(au2), AU4: clampNormalized(au4),
               AU6: clampNormalized(au6), AU7: clampNormalized(au7), AU9: clampNormalized(au9),
@@ -123,12 +123,16 @@
     let sessionTimestamp = '';
     let auHistory = {};
 
+
+    // detect facial landmarks from a video feed
     faceMesh = new FaceMesh({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
     });
     faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.6, minTrackingConfidence: 0.5 });
     faceMesh.onResults(onResults);
 
+
+    // draws a line between two facial landmarks on the canvas (overlay) and adds a text label at the midpoint.
     function drawLine(i, j, landmarks, label) {
       ctx.beginPath();
       ctx.moveTo(landmarks[i].x * overlay.width, landmarks[i].y * overlay.height);
@@ -143,6 +147,9 @@
       ctx.fillText(label, midX + 4, midY - 4);
     }
 
+
+
+    // processing loop for the AU detector, handling faceMesh results to compute AU values, draw visualizations on overlay, and update auListDiv.
     function onResults(results){
       overlay.width = video.videoWidth;
       overlay.height = video.videoHeight;
@@ -185,6 +192,9 @@
       renderAUList(lastAUs);
     }
 
+
+
+    // updates the auListDiv to display current and mean AU intensities in a styled, user-friendly format, complementing the overlay canvas’s visualizations.
     function renderAUList(aus){
       const order = ['AU1','AU2','AU4','AU6','AU7','AU9','AU10','AU12','AU14','AU15','AU17','AU20','AU23','AU25','AU26','AU45'];
       auListDiv.innerHTML = '';
@@ -204,14 +214,19 @@
       });
     }
 
-    function computeMean(arr){ return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0; }
-    function computeStd(arr){ if(arr.length<2) return 0; const m=computeMean(arr); return Math.sqrt(arr.reduce((a,b)=>a+Math.pow(b-m,2),0)/(arr.length-1)); }
-    function computeMin(arr){ return arr.length ? Math.min(...arr) : 0; }
-    function computeMax(arr){ return arr.length ? Math.max(...arr) : 0; }
-    function computeMedian(arr){ if(!arr.length) return 0; const s=[...arr].sort((a,b)=>a-b); const m=Math.floor(s.length/2); return s.length%2? s[m] : (s[m-1]+s[m])/2; }
-    function computeSkewness(arr){ if(arr.length<2) return 0; const m=computeMean(arr), s=computeStd(arr); if(s===0) return 0; const n=arr.length; return arr.reduce((a,b)=>a+Math.pow(b-m,3),0)/n/Math.pow(s,3); }
-    function computeKurtosis(arr){ if(arr.length<2) return 0; const m=computeMean(arr), s=computeStd(arr); if(s===0) return 0; const n=arr.length; return arr.reduce((a,b)=>a+Math.pow(b-m,4),0)/n/Math.pow(s,4)-3; }
 
+
+    // statistical functions (computeMean, computeStd, computeMin, computeMax, computeMedian, computeSkewness, computeKurtosis) analyze AU intensities in auHistory, supporting real-time display in auListDiv (via computeMean) and summary CSV export (via all functions)
+    function computeMean(arr){ return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0; }   // Calculates the arithmetic mean (average) of an array of numbers.
+    function computeStd(arr){ if(arr.length<2) return 0; const m=computeMean(arr); return Math.sqrt(arr.reduce((a,b)=>a+Math.pow(b-m,2),0)/(arr.length-1)); }    // Calculates the sample standard deviation of an array, measuring data spread.
+    function computeMin(arr){ return arr.length ? Math.min(...arr) : 0; }  // Finds the minimum value in an array.
+    function computeMax(arr){ return arr.length ? Math.max(...arr) : 0; }  // Finds the maximum value in an array.
+    function computeMedian(arr){ if(!arr.length) return 0; const s=[...arr].sort((a,b)=>a-b); const m=Math.floor(s.length/2); return s.length%2? s[m] : (s[m-1]+s[m])/2; }  // Calculates the median (middle value) of an array.
+    function computeSkewness(arr){ if(arr.length<2) return 0; const m=computeMean(arr), s=computeStd(arr); if(s===0) return 0; const n=arr.length; return arr.reduce((a,b)=>a+Math.pow(b-m,3),0)/n/Math.pow(s,3); }  // Calculates the skewness of an array, measuring the asymmetry of the data distribution.
+    function computeKurtosis(arr){ if(arr.length<2) return 0; const m=computeMean(arr), s=computeStd(arr); if(s===0) return 0; const n=arr.length; return arr.reduce((a,b)=>a+Math.pow(b-m,4),0)/n/Math.pow(s,4)-3; }  // Calculates the excess kurtosis, measuring the “tailedness” of the data distribution.
+
+
+    // The startBtn.onclick function initiates the AU detection process with a 3-second countdown, manages button states, and triggers startRecording.
     startBtn.onclick = function() {
       startBtn.disabled = true;
       stopBtn.disabled = false;
@@ -225,6 +240,8 @@
       }, 1000);
     };
 
+
+    // The startRecording function sets up the video stream, initializes the MediaRecorder, and starts capturing frames for AU detection.
     async function startRecording() {
       sessionTimestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const constraints = { video: { width: 640, height: 480, facingMode: facing.value }, audio: true };
@@ -258,6 +275,8 @@
       }, 500);
     }
 
+
+    // The stopBtn.onclick function stops the camera, MediaRecorder, and sampling interval, resets the video stream, and updates button states.
     stopBtn.onclick = () => {
       if (camera) camera.stop();
       if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
@@ -266,6 +285,9 @@
       startBtn.disabled = false; stopBtn.disabled = true;
     };
 
+
+
+    // The downloadBtn.onclick function generates a CSV file from the recorded AU data and triggers a download.
     downloadBtn.onclick = () => {
       if (csvRows.length > 1) {
         const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
@@ -275,6 +297,8 @@
       }
     };
 
+
+    // The summaryBtn.onclick function generates a summary CSV file from the recorded AU data, calculating mean, std, min, max, median, skewness, and kurtosis for each AU.
     summaryBtn.onclick = () => {
       const summaryRows = ["AU,Mean,Std,Min,Max,Median,Skewness,Kurtosis"];
       Object.keys(auHistory).forEach(au => {
