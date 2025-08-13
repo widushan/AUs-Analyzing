@@ -54,248 +54,249 @@
 
 <script>
 (async () => {
-  function dist(a,b){ const dx=a.x-b.x, dy=a.y-b.y; return Math.hypot(dx,dy); }
-  function meanPoint(pts){ return {x: pts.reduce((s,p)=>s+p.x,0)/pts.length, y: pts.reduce((s,p)=>s+p.y,0)/pts.length}; }
-  function clampNormalized(x){ if (!isFinite(x)) return 0; return Math.max(0, Math.min(1, x + 0.5)); }
+    function dist(a,b){ const dx=a.x-b.x, dy=a.y-b.y; return Math.hypot(dx,dy); }  // Calculates the Euclidean distance between two points in a 2D plane.
+    function meanPoint(pts){ return {x: pts.reduce((s,p)=>s+p.x,0)/pts.length, y: pts.reduce((s,p)=>s+p.y,0)/pts.length}; }  // Calculates the average (mean) coordinates of a set of points in a 2D plane.
+    function clampNormalized(x){ if (!isFinite(x)) return 0; return Math.max(0, Math.min(1, x + 0.5)); }  // Normalizes and clamps a value to the range [0, 1] after applying an offset.
 
-  const idx = {
-    leftEyeOuter: 33, rightEyeOuter: 263,
-    leftUpperEyelid: 159, leftLowerEyelid: 145,
-    rightUpperEyelid: 386, rightLowerEyelid: 374,
-    leftInnerBrow: 70, leftOuterBrow: 105,
-    rightInnerBrow: 300, rightOuterBrow: 334,
-    mouthLeft: 61, mouthRight: 291,
-    upperLip: 13, lowerLip: 14,
-    chinLower: 152, jawPoint: 17,
-    noseTip: 1, noseBridge: 6
-  };
+    const idx = {
+      leftEyeOuter: 33, rightEyeOuter: 263,
+      leftUpperEyelid: 159, leftLowerEyelid: 145,
+      rightUpperEyelid: 386, rightLowerEyelid: 374,
+      leftInnerBrow: 70, leftOuterBrow: 105,
+      rightInnerBrow: 300, rightOuterBrow: 334,
+      mouthLeft: 61, mouthRight: 291,
+      upperLip: 13, lowerLip: 14,
+      chinLower: 152, jawPoint: 17,
+      noseTip: 1, noseBridge: 6
+    };
 
-  function computeAUs(landmarks){
-    const L = (i)=>({x: landmarks[i].x, y: landmarks[i].y});
-    const iod = dist(L(idx.leftEyeOuter), L(idx.rightEyeOuter)) || 1;
+    function computeAUs(landmarks){
+      const L = (i)=>({x: landmarks[i].x, y: landmarks[i].y});
+      const iod = dist(L(idx.leftEyeOuter), L(idx.rightEyeOuter)) || 1;
 
-    const au1 = -((L(idx.leftInnerBrow).y - meanPoint([L(idx.leftUpperEyelid), L(idx.leftLowerEyelid)]).y +
-                   L(idx.rightInnerBrow).y - meanPoint([L(idx.rightUpperEyelid), L(idx.rightLowerEyelid)]).y) / 2) / iod;
-    const au2 = -((L(idx.leftOuterBrow).y - L(idx.leftUpperEyelid).y +
-                   L(idx.rightOuterBrow).y - L(idx.rightUpperEyelid).y) / 2) / iod;
-    const au4 = ((L(idx.leftInnerBrow).y + L(idx.rightInnerBrow).y)/2 - 
-                 (L(idx.leftUpperEyelid).y + L(idx.rightUpperEyelid).y)/2) / iod;
-    const leftGap = L(idx.leftUpperEyelid).y - L(idx.leftLowerEyelid).y;
-    const rightGap = L(idx.rightUpperEyelid).y - L(idx.rightLowerEyelid).y;
-    const au6 = -( (leftGap + rightGap) / 2 ) / iod;
-    const au7 = Math.max(0, au6*1.2);
-    const au9 = -(L(idx.noseTip).y - L(idx.upperLip).y) / iod;
-    const au10 = au9 * 0.9;
-    const mouthWidth = dist(L(idx.mouthLeft), L(idx.mouthRight));
-    const au12 = mouthWidth / iod;
-    const lipHeight = Math.abs(L(idx.upperLip).y - L(idx.lowerLip).y) || 1e-6;
-    const au14 = (mouthWidth / lipHeight) / 10;
-    const mouthMidY = (L(idx.mouthLeft).y + L(idx.mouthRight).y) / 2;
-    const au15 = (( (L(idx.mouthLeft).y - mouthMidY) + (L(idx.mouthRight).y - mouthMidY) )/2) / iod;
-    const au17 = -( (L(idx.lowerLip).y - L(idx.chinLower).y) / iod );
-    const au20 = mouthWidth / iod;
-    const au23 = 1 - (lipHeight*2 / iod);
-    const au25 = Math.abs(L(idx.upperLip).y - L(idx.lowerLip).y) / iod;
-    const au26 = Math.abs(L(idx.jawPoint).y - L(idx.chinLower).y) / iod;
-    const au45 = (leftGap + rightGap) / (2*iod);
+      const au1 = -((L(idx.leftInnerBrow).y - meanPoint([L(idx.leftUpperEyelid), L(idx.leftLowerEyelid)]).y +
+                    L(idx.rightInnerBrow).y - meanPoint([L(idx.rightUpperEyelid), L(idx.rightLowerEyelid)]).y) / 2) / iod;
+      const au2 = -((L(idx.leftOuterBrow).y - L(idx.leftUpperEyelid).y +
+                    L(idx.rightOuterBrow).y - L(idx.rightUpperEyelid).y) / 2) / iod;
+      const au4 = ((L(idx.leftInnerBrow).y + L(idx.rightInnerBrow).y)/2 - 
+                  (L(idx.leftUpperEyelid).y + L(idx.rightUpperEyelid).y)/2) / iod;
+      const leftGap = L(idx.leftUpperEyelid).y - L(idx.leftLowerEyelid).y;
+      const rightGap = L(idx.rightUpperEyelid).y - L(idx.rightLowerEyelid).y;
+      const au6 = -( (leftGap + rightGap) / 2 ) / iod;
+      const au7 = Math.max(0, au6*1.2);
+      const au9 = -(L(idx.noseTip).y - L(idx.upperLip).y) / iod;
+      const au10 = au9 * 0.9;
+      const mouthWidth = dist(L(idx.mouthLeft), L(idx.mouthRight));
+      const au12 = mouthWidth / iod;
+      const lipHeight = Math.abs(L(idx.upperLip).y - L(idx.lowerLip).y) || 1e-6;
+      const au14 = (mouthWidth / lipHeight) / 10;
+      const mouthMidY = (L(idx.mouthLeft).y + L(idx.mouthRight).y) / 2;
+      const au15 = (( (L(idx.mouthLeft).y - mouthMidY) + (L(idx.mouthRight).y - mouthMidY) )/2) / iod;
+      const au17 = -( (L(idx.lowerLip).y - L(idx.chinLower).y) / iod );
+      const au20 = mouthWidth / iod;
+      const au23 = 1 - (lipHeight*2 / iod);
+      const au25 = Math.abs(L(idx.upperLip).y - L(idx.lowerLip).y) / iod;
+      const au26 = Math.abs(L(idx.jawPoint).y - L(idx.chinLower).y) / iod;
+      const au45 = (leftGap + rightGap) / (2*iod);
 
-    return { AU1: clampNormalized(au1), AU2: clampNormalized(au2), AU4: clampNormalized(au4),
-             AU6: clampNormalized(au6), AU7: clampNormalized(au7), AU9: clampNormalized(au9),
-             AU10: clampNormalized(au10), AU12: clampNormalized(au12), AU14: clampNormalized(au14),
-             AU15: clampNormalized(au15), AU17: clampNormalized(au17), AU20: clampNormalized(au20),
-             AU23: clampNormalized(au23), AU25: clampNormalized(au25), AU26: clampNormalized(au26),
-             AU45: clampNormalized(au45), iod: iod };
-  }
-
-  const video = document.getElementById('video');
-  const overlay = document.getElementById('overlay');
-  const ctx = overlay.getContext('2d');
-  const auListDiv = document.getElementById('auList');
-  const startBtn = document.getElementById('startBtn');
-  const stopBtn = document.getElementById('stopBtn');
-  const facing = document.getElementById('facing');
-  const downloadBtn = document.getElementById('download');
-  const summaryBtn = document.getElementById('downloadSummary');
-  const countdownDiv = document.getElementById('countdown');
-
-  let camera = null, faceMesh = null, lastAUs = null, csvRows = [], samplingInterval = null;
-  let mediaRecorder, recordedChunks = [];
-  let sessionTimestamp = '';
-  let auHistory = {};
-
-  faceMesh = new FaceMesh({
-    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
-  });
-  faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.6, minTrackingConfidence: 0.5 });
-  faceMesh.onResults(onResults);
-
-  function drawLine(i, j, landmarks, label) {
-    ctx.beginPath();
-    ctx.moveTo(landmarks[i].x * overlay.width, landmarks[i].y * overlay.height);
-    ctx.lineTo(landmarks[j].x * overlay.width, landmarks[j].y * overlay.height);
-    ctx.strokeStyle = "lime";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    const midX = (landmarks[i].x + landmarks[j].x) / 2 * overlay.width;
-    const midY = (landmarks[i].y + landmarks[j].y) / 2 * overlay.height;
-    ctx.fillStyle = "black";
-    ctx.font = "14px Arial";
-    ctx.fillText(label, midX + 4, midY - 4);
-  }
-
-  function onResults(results){
-    overlay.width = video.videoWidth;
-    overlay.height = video.videoHeight;
-    ctx.clearRect(0,0,overlay.width, overlay.height);
-
-    if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
-      ctx.fillStyle = "orange";
-      ctx.fillText("No face detected", 10, 20);
-      return;
+      return { AU1: clampNormalized(au1), AU2: clampNormalized(au2), AU4: clampNormalized(au4),
+              AU6: clampNormalized(au6), AU7: clampNormalized(au7), AU9: clampNormalized(au9),
+              AU10: clampNormalized(au10), AU12: clampNormalized(au12), AU14: clampNormalized(au14),
+              AU15: clampNormalized(au15), AU17: clampNormalized(au17), AU20: clampNormalized(au20),
+              AU23: clampNormalized(au23), AU25: clampNormalized(au25), AU26: clampNormalized(au26),
+              AU45: clampNormalized(au45), iod: iod };
     }
-    const lm = results.multiFaceLandmarks[0];
-    lastAUs = computeAUs(lm);
 
-    // Green lines for all AUs
-    drawLine(idx.leftInnerBrow, idx.leftUpperEyelid, lm, "AU1(L)");
-    drawLine(idx.rightInnerBrow, idx.rightUpperEyelid, lm, "AU1(R)");
-    drawLine(idx.leftOuterBrow, idx.leftUpperEyelid, lm, "AU2(L)");
-    drawLine(idx.rightOuterBrow, idx.rightUpperEyelid, lm, "AU2(R)");
-    drawLine(idx.leftInnerBrow, idx.leftLowerEyelid, lm, "AU4(L)");
-    drawLine(idx.rightInnerBrow, idx.rightLowerEyelid, lm, "AU4(R)");
-    drawLine(idx.leftUpperEyelid, idx.leftLowerEyelid, lm, "AU6(L)");
-    drawLine(idx.rightUpperEyelid, idx.rightLowerEyelid, lm, "AU6(R)");
-    drawLine(idx.leftLowerEyelid, idx.leftUpperEyelid, lm, "AU7(L)");
-    drawLine(idx.rightLowerEyelid, idx.rightUpperEyelid, lm, "AU7(R)");
-    drawLine(idx.noseTip, idx.upperLip, lm, "AU9");
-    drawLine(idx.noseBridge, idx.upperLip, lm, "AU10");
-    drawLine(idx.mouthLeft, idx.noseTip, lm, "AU12(L)");
-    drawLine(idx.mouthRight, idx.noseTip, lm, "AU12(R)");
-    drawLine(idx.mouthLeft, idx.upperLip, lm, "AU14(L)");
-    drawLine(idx.mouthRight, idx.upperLip, lm, "AU14(R)");
-    drawLine(idx.mouthLeft, idx.lowerLip, lm, "AU15(L)");
-    drawLine(idx.mouthRight, idx.lowerLip, lm, "AU15(R)");
-    drawLine(idx.lowerLip, idx.chinLower, lm, "AU17");
-    drawLine(idx.mouthLeft, idx.mouthRight, lm, "AU20");
-    drawLine(idx.upperLip, idx.lowerLip, lm, "AU23/25");
-    drawLine(idx.jawPoint, idx.chinLower, lm, "AU26");
-    drawLine(idx.leftUpperEyelid, idx.leftLowerEyelid, lm, "AU45(L)");
-    drawLine(idx.rightUpperEyelid, idx.rightLowerEyelid, lm, "AU45(R)");
+    const video = document.getElementById('video');
+    const overlay = document.getElementById('overlay');
+    const ctx = overlay.getContext('2d');
+    const auListDiv = document.getElementById('auList');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const facing = document.getElementById('facing');
+    const downloadBtn = document.getElementById('download');
+    const summaryBtn = document.getElementById('downloadSummary');
+    const countdownDiv = document.getElementById('countdown');
 
-    renderAUList(lastAUs);
-  }
+    let camera = null, faceMesh = null, lastAUs = null, csvRows = [], samplingInterval = null;
+    let mediaRecorder, recordedChunks = [];
+    let sessionTimestamp = '';
+    let auHistory = {};
 
-  function renderAUList(aus){
-    const order = ['AU1','AU2','AU4','AU6','AU7','AU9','AU10','AU12','AU14','AU15','AU17','AU20','AU23','AU25','AU26','AU45'];
-    auListDiv.innerHTML = '';
-    order.forEach(k=>{
-      const val = aus[k]||0;
-      const meanVal = auHistory[k]?.length ? computeMean(auHistory[k]) : 0;
-      const item = document.createElement('div');
-      item.className = 'au-item';
-      const name = document.createElement('div'); name.textContent = k;
-      const v = document.createElement('div'); 
-      v.innerHTML = `${val.toFixed(2)} <small class="mean-label">(avg: ${meanVal.toFixed(2)})</small>`;
-      if (val > 0.6) v.className = 'good';
-      else if (val > 0.3) v.className = 'low';
-      else v.className = 'verylow';
-      item.appendChild(name); item.appendChild(v);
-      auListDiv.appendChild(item);
+    faceMesh = new FaceMesh({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
     });
-  }
+    faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.6, minTrackingConfidence: 0.5 });
+    faceMesh.onResults(onResults);
 
-  function computeMean(arr){ return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0; }
-  function computeStd(arr){ if(arr.length<2) return 0; const m=computeMean(arr); return Math.sqrt(arr.reduce((a,b)=>a+Math.pow(b-m,2),0)/(arr.length-1)); }
-  function computeMin(arr){ return arr.length ? Math.min(...arr) : 0; }
-  function computeMax(arr){ return arr.length ? Math.max(...arr) : 0; }
-  function computeMedian(arr){ if(!arr.length) return 0; const s=[...arr].sort((a,b)=>a-b); const m=Math.floor(s.length/2); return s.length%2? s[m] : (s[m-1]+s[m])/2; }
-  function computeSkewness(arr){ if(arr.length<2) return 0; const m=computeMean(arr), s=computeStd(arr); if(s===0) return 0; const n=arr.length; return arr.reduce((a,b)=>a+Math.pow(b-m,3),0)/n/Math.pow(s,3); }
-  function computeKurtosis(arr){ if(arr.length<2) return 0; const m=computeMean(arr), s=computeStd(arr); if(s===0) return 0; const n=arr.length; return arr.reduce((a,b)=>a+Math.pow(b-m,4),0)/n/Math.pow(s,4)-3; }
+    function drawLine(i, j, landmarks, label) {
+      ctx.beginPath();
+      ctx.moveTo(landmarks[i].x * overlay.width, landmarks[i].y * overlay.height);
+      ctx.lineTo(landmarks[j].x * overlay.width, landmarks[j].y * overlay.height);
+      ctx.strokeStyle = "lime";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      const midX = (landmarks[i].x + landmarks[j].x) / 2 * overlay.width;
+      const midY = (landmarks[i].y + landmarks[j].y) / 2 * overlay.height;
+      ctx.fillStyle = "black";
+      ctx.font = "14px Arial";
+      ctx.fillText(label, midX + 4, midY - 4);
+    }
 
-  startBtn.onclick = function() {
-    startBtn.disabled = true;
-    stopBtn.disabled = false;
-    let count = 3;
-    countdownDiv.textContent = count;
-    const countdownInterval = setInterval(() => {
-      count--;
-      if (count > 0) countdownDiv.textContent = count;
-      else if (count === 0) countdownDiv.textContent = "Start!";
-      else { clearInterval(countdownInterval); countdownDiv.textContent = ""; startRecording(); }
-    }, 1000);
-  };
+    function onResults(results){
+      overlay.width = video.videoWidth;
+      overlay.height = video.videoHeight;
+      ctx.clearRect(0,0,overlay.width, overlay.height);
 
-  async function startRecording() {
-    sessionTimestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const constraints = { video: { width: 640, height: 480, facingMode: facing.value }, audio: true };
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    video.srcObject = stream;
-    video.muted = true; await video.play();
+      if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
+        ctx.fillStyle = "orange";
+        ctx.fillText("No face detected", 10, 20);
+        return;
+      }
+      const lm = results.multiFaceLandmarks[0];
+      lastAUs = computeAUs(lm);
 
-    recordedChunks = [];
-    mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
-    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
-    mediaRecorder.onstop = () => {
-      const blob = new Blob(recordedChunks, { type: 'video/webm' });
+      // Green lines for all AUs
+      drawLine(idx.leftInnerBrow, idx.leftUpperEyelid, lm, "AU1(L)");
+      drawLine(idx.rightInnerBrow, idx.rightUpperEyelid, lm, "AU1(R)");
+      drawLine(idx.leftOuterBrow, idx.leftUpperEyelid, lm, "AU2(L)");
+      drawLine(idx.rightOuterBrow, idx.rightUpperEyelid, lm, "AU2(R)");
+      drawLine(idx.leftInnerBrow, idx.leftLowerEyelid, lm, "AU4(L)");
+      drawLine(idx.rightInnerBrow, idx.rightLowerEyelid, lm, "AU4(R)");
+      drawLine(idx.leftUpperEyelid, idx.leftLowerEyelid, lm, "AU6(L)");
+      drawLine(idx.rightUpperEyelid, idx.rightLowerEyelid, lm, "AU6(R)");
+      drawLine(idx.leftLowerEyelid, idx.leftUpperEyelid, lm, "AU7(L)");
+      drawLine(idx.rightLowerEyelid, idx.rightUpperEyelid, lm, "AU7(R)");
+      drawLine(idx.noseTip, idx.upperLip, lm, "AU9");
+      drawLine(idx.noseBridge, idx.upperLip, lm, "AU10");
+      drawLine(idx.mouthLeft, idx.noseTip, lm, "AU12(L)");
+      drawLine(idx.mouthRight, idx.noseTip, lm, "AU12(R)");
+      drawLine(idx.mouthLeft, idx.upperLip, lm, "AU14(L)");
+      drawLine(idx.mouthRight, idx.upperLip, lm, "AU14(R)");
+      drawLine(idx.mouthLeft, idx.lowerLip, lm, "AU15(L)");
+      drawLine(idx.mouthRight, idx.lowerLip, lm, "AU15(R)");
+      drawLine(idx.lowerLip, idx.chinLower, lm, "AU17");
+      drawLine(idx.mouthLeft, idx.mouthRight, lm, "AU20");
+      drawLine(idx.upperLip, idx.lowerLip, lm, "AU23/25");
+      drawLine(idx.jawPoint, idx.chinLower, lm, "AU26");
+      drawLine(idx.leftUpperEyelid, idx.leftLowerEyelid, lm, "AU45(L)");
+      drawLine(idx.rightUpperEyelid, idx.rightLowerEyelid, lm, "AU45(R)");
+
+      renderAUList(lastAUs);
+    }
+
+    function renderAUList(aus){
+      const order = ['AU1','AU2','AU4','AU6','AU7','AU9','AU10','AU12','AU14','AU15','AU17','AU20','AU23','AU25','AU26','AU45'];
+      auListDiv.innerHTML = '';
+      order.forEach(k=>{
+        const val = aus[k]||0;
+        const meanVal = auHistory[k]?.length ? computeMean(auHistory[k]) : 0;
+        const item = document.createElement('div');
+        item.className = 'au-item';
+        const name = document.createElement('div'); name.textContent = k;
+        const v = document.createElement('div'); 
+        v.innerHTML = `${val.toFixed(2)} <small class="mean-label">(avg: ${meanVal.toFixed(2)})</small>`;
+        if (val > 0.6) v.className = 'good';
+        else if (val > 0.3) v.className = 'low';
+        else v.className = 'verylow';
+        item.appendChild(name); item.appendChild(v);
+        auListDiv.appendChild(item);
+      });
+    }
+
+    function computeMean(arr){ return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0; }
+    function computeStd(arr){ if(arr.length<2) return 0; const m=computeMean(arr); return Math.sqrt(arr.reduce((a,b)=>a+Math.pow(b-m,2),0)/(arr.length-1)); }
+    function computeMin(arr){ return arr.length ? Math.min(...arr) : 0; }
+    function computeMax(arr){ return arr.length ? Math.max(...arr) : 0; }
+    function computeMedian(arr){ if(!arr.length) return 0; const s=[...arr].sort((a,b)=>a-b); const m=Math.floor(s.length/2); return s.length%2? s[m] : (s[m-1]+s[m])/2; }
+    function computeSkewness(arr){ if(arr.length<2) return 0; const m=computeMean(arr), s=computeStd(arr); if(s===0) return 0; const n=arr.length; return arr.reduce((a,b)=>a+Math.pow(b-m,3),0)/n/Math.pow(s,3); }
+    function computeKurtosis(arr){ if(arr.length<2) return 0; const m=computeMean(arr), s=computeStd(arr); if(s===0) return 0; const n=arr.length; return arr.reduce((a,b)=>a+Math.pow(b-m,4),0)/n/Math.pow(s,4)-3; }
+
+    startBtn.onclick = function() {
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+      let count = 3;
+      countdownDiv.textContent = count;
+      const countdownInterval = setInterval(() => {
+        count--;
+        if (count > 0) countdownDiv.textContent = count;
+        else if (count === 0) countdownDiv.textContent = "Start!";
+        else { clearInterval(countdownInterval); countdownDiv.textContent = ""; startRecording(); }
+      }, 1000);
+    };
+
+    async function startRecording() {
+      sessionTimestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const constraints = { video: { width: 640, height: 480, facingMode: facing.value }, audio: true };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      video.srcObject = stream;
+      video.muted = true; await video.play();
+
+      recordedChunks = [];
+      mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = `session_${sessionTimestamp}.webm`; a.click();
+        URL.revokeObjectURL(url);
+      };
+      mediaRecorder.start();
+
+      camera = new Camera(video, { onFrame: async () => { await faceMesh.send({image: video}); }, width: 640, height: 480 });
+      camera.start();
+
+      const auOrder = ['timestamp','AU1','AU2','AU4','AU6','AU7','AU9','AU10','AU12','AU14','AU15','AU17','AU20','AU23','AU25','AU26','AU45','iod'];
+      csvRows = [auOrder.join(',')];
+      auHistory = {}; auOrder.slice(1).forEach(k => { auHistory[k] = []; });
+
+      samplingInterval = setInterval(()=> {
+        if (lastAUs){
+          auOrder.slice(1).forEach(k => auHistory[k].push(lastAUs[k] ?? 0));
+          csvRows.push([ new Date().toISOString(), ...auOrder.slice(1).map(k => lastAUs[k]?.toFixed(3) ?? '0.000') ].join(','));
+        }
+      }, 500);
+    }
+
+    stopBtn.onclick = () => {
+      if (camera) camera.stop();
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+      if (samplingInterval) clearInterval(samplingInterval);
+      if (video.srcObject) { video.srcObject.getTracks().forEach(track => track.stop()); video.srcObject = null; }
+      startBtn.disabled = false; stopBtn.disabled = true;
+    };
+
+    downloadBtn.onclick = () => {
+      if (csvRows.length > 1) {
+        const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = `au_data_${sessionTimestamp}.csv`; a.click();
+        URL.revokeObjectURL(url);
+      }
+    };
+
+    summaryBtn.onclick = () => {
+      const summaryRows = ["AU,Mean,Std,Min,Max,Median,Skewness,Kurtosis"];
+      Object.keys(auHistory).forEach(au => {
+        const vals = auHistory[au];
+        summaryRows.push([
+          au,
+          computeMean(vals).toFixed(4),
+          computeStd(vals).toFixed(4),
+          computeMin(vals).toFixed(4),
+          computeMax(vals).toFixed(4),
+          computeMedian(vals).toFixed(4),
+          computeSkewness(vals).toFixed(4),
+          computeKurtosis(vals).toFixed(4)
+        ].join(","));
+      });
+      const blob = new Blob([summaryRows.join("\n")], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = `session_${sessionTimestamp}.webm`; a.click();
+      const a = document.createElement("a"); a.href = url; a.download = `au_summary_${sessionTimestamp}.csv`; a.click();
       URL.revokeObjectURL(url);
     };
-    mediaRecorder.start();
-
-    camera = new Camera(video, { onFrame: async () => { await faceMesh.send({image: video}); }, width: 640, height: 480 });
-    camera.start();
-
-    const auOrder = ['timestamp','AU1','AU2','AU4','AU6','AU7','AU9','AU10','AU12','AU14','AU15','AU17','AU20','AU23','AU25','AU26','AU45','iod'];
-    csvRows = [auOrder.join(',')];
-    auHistory = {}; auOrder.slice(1).forEach(k => { auHistory[k] = []; });
-
-    samplingInterval = setInterval(()=> {
-      if (lastAUs){
-        auOrder.slice(1).forEach(k => auHistory[k].push(lastAUs[k] ?? 0));
-        csvRows.push([ new Date().toISOString(), ...auOrder.slice(1).map(k => lastAUs[k]?.toFixed(3) ?? '0.000') ].join(','));
-      }
-    }, 500);
   }
-
-  stopBtn.onclick = () => {
-    if (camera) camera.stop();
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
-    if (samplingInterval) clearInterval(samplingInterval);
-    if (video.srcObject) { video.srcObject.getTracks().forEach(track => track.stop()); video.srcObject = null; }
-    startBtn.disabled = false; stopBtn.disabled = true;
-  };
-
-  downloadBtn.onclick = () => {
-    if (csvRows.length > 1) {
-      const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = `au_data_${sessionTimestamp}.csv`; a.click();
-      URL.revokeObjectURL(url);
-    }
-  };
-
-  summaryBtn.onclick = () => {
-    const summaryRows = ["AU,Mean,Std,Min,Max,Median,Skewness,Kurtosis"];
-    Object.keys(auHistory).forEach(au => {
-      const vals = auHistory[au];
-      summaryRows.push([
-        au,
-        computeMean(vals).toFixed(4),
-        computeStd(vals).toFixed(4),
-        computeMin(vals).toFixed(4),
-        computeMax(vals).toFixed(4),
-        computeMedian(vals).toFixed(4),
-        computeSkewness(vals).toFixed(4),
-        computeKurtosis(vals).toFixed(4)
-      ].join(","));
-    });
-    const blob = new Blob([summaryRows.join("\n")], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `au_summary_${sessionTimestamp}.csv`; a.click();
-    URL.revokeObjectURL(url);
-  };
-})();
+)();
 </script>
 </body>
 </html>
