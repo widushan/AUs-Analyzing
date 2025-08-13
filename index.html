@@ -214,6 +214,55 @@
     });
   }
 
+  function computeMean(arr) {
+      if (arr.length === 0) return 0;
+      return arr.reduce((a, b) => a + b, 0) / arr.length;
+    }
+
+    function computeStd(arr) {
+      if (arr.length < 2) return 0;
+      const m = computeMean(arr);
+      const variance = arr.reduce((a, b) => a + Math.pow(b - m, 2), 0) / (arr.length - 1);
+      return Math.sqrt(variance);
+    }
+
+    function computeMin(arr) {
+      if (arr.length === 0) return 0;
+      return Math.min(...arr);
+    }
+
+    function computeMax(arr) {
+      if (arr.length === 0) return 0;
+      return Math.max(...arr);
+    }
+
+    function computeMedian(arr) {
+      if (arr.length === 0) return 0;
+      const sorted = [...arr].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+    }
+
+    function computeSkewness(arr) {
+      if (arr.length < 2) return 0;
+      const m = computeMean(arr);
+      const s = computeStd(arr);
+      if (s === 0) return 0;
+      const n = arr.length;
+      const skew = arr.reduce((a, b) => a + Math.pow(b - m, 3), 0) / n;
+      return skew / Math.pow(s, 3);
+    }
+
+    function computeKurtosis(arr) {
+      if (arr.length < 2) return 0;
+      const m = computeMean(arr);
+      const s = computeStd(arr);
+      if (s === 0) return 0;
+      const n = arr.length;
+      const kurt = arr.reduce((a, b) => a + Math.pow(b - m, 4), 0) / n;
+      return (kurt / Math.pow(s, 4)) - 3; // Excess kurtosis
+    }
+
   startBtn.onclick = function() {
     startBtn.disabled = true;
     stopBtn.disabled = false;
