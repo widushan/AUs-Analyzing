@@ -15,8 +15,8 @@
     .au-item:last-child{border-bottom:0;}
     .good { color:green } .low { color:orange } .verylow { color:crimson }
     #countdown { font-size: 48px; font-weight: bold; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #ff5722; z-index: 10; }
+    small.mean-label { color: #555; font-size: 0.8em; margin-left: 4px; }
   </style>
-  <!-- Correct MediaPipe imports -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
@@ -48,6 +48,7 @@
     <div class="au-list" id="auList"></div>
     <div style="margin-top:10px;">
       <button id="download">Download CSV</button>
+      <button id="downloadSummary">Download Summary CSV</button>
     </div>
   </div>
 
@@ -114,11 +115,13 @@
   const stopBtn = document.getElementById('stopBtn');
   const facing = document.getElementById('facing');
   const downloadBtn = document.getElementById('download');
+  const summaryBtn = document.getElementById('downloadSummary');
   const countdownDiv = document.getElementById('countdown');
 
   let camera = null, faceMesh = null, lastAUs = null, csvRows = [], samplingInterval = null;
   let mediaRecorder, recordedChunks = [];
   let sessionTimestamp = '';
+  let auHistory = {};
 
   faceMesh = new FaceMesh({
     locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
@@ -153,44 +156,29 @@
     const lm = results.multiFaceLandmarks[0];
     lastAUs = computeAUs(lm);
 
-    // Simple 1–2 lines per AU
-    // AU1
+    // Green lines for all AUs
     drawLine(idx.leftInnerBrow, idx.leftUpperEyelid, lm, "AU1(L)");
     drawLine(idx.rightInnerBrow, idx.rightUpperEyelid, lm, "AU1(R)");
-    // AU2
     drawLine(idx.leftOuterBrow, idx.leftUpperEyelid, lm, "AU2(L)");
     drawLine(idx.rightOuterBrow, idx.rightUpperEyelid, lm, "AU2(R)");
-    // AU4
     drawLine(idx.leftInnerBrow, idx.leftLowerEyelid, lm, "AU4(L)");
     drawLine(idx.rightInnerBrow, idx.rightLowerEyelid, lm, "AU4(R)");
-    // AU6
     drawLine(idx.leftUpperEyelid, idx.leftLowerEyelid, lm, "AU6(L)");
     drawLine(idx.rightUpperEyelid, idx.rightLowerEyelid, lm, "AU6(R)");
-    // AU7
     drawLine(idx.leftLowerEyelid, idx.leftUpperEyelid, lm, "AU7(L)");
     drawLine(idx.rightLowerEyelid, idx.rightUpperEyelid, lm, "AU7(R)");
-    // AU9
     drawLine(idx.noseTip, idx.upperLip, lm, "AU9");
-    // AU10
     drawLine(idx.noseBridge, idx.upperLip, lm, "AU10");
-    // AU12
     drawLine(idx.mouthLeft, idx.noseTip, lm, "AU12(L)");
     drawLine(idx.mouthRight, idx.noseTip, lm, "AU12(R)");
-    // AU14
     drawLine(idx.mouthLeft, idx.upperLip, lm, "AU14(L)");
     drawLine(idx.mouthRight, idx.upperLip, lm, "AU14(R)");
-    // AU15
     drawLine(idx.mouthLeft, idx.lowerLip, lm, "AU15(L)");
     drawLine(idx.mouthRight, idx.lowerLip, lm, "AU15(R)");
-    // AU17
     drawLine(idx.lowerLip, idx.chinLower, lm, "AU17");
-    // AU20
     drawLine(idx.mouthLeft, idx.mouthRight, lm, "AU20");
-    // AU23 and AU25
     drawLine(idx.upperLip, idx.lowerLip, lm, "AU23/25");
-    // AU26
     drawLine(idx.jawPoint, idx.chinLower, lm, "AU26");
-    // AU45
     drawLine(idx.leftUpperEyelid, idx.leftLowerEyelid, lm, "AU45(L)");
     drawLine(idx.rightUpperEyelid, idx.rightLowerEyelid, lm, "AU45(R)");
 
@@ -202,10 +190,12 @@
     auListDiv.innerHTML = '';
     order.forEach(k=>{
       const val = aus[k]||0;
+      const meanVal = auHistory[k]?.length ? computeMean(auHistory[k]) : 0;
       const item = document.createElement('div');
       item.className = 'au-item';
       const name = document.createElement('div'); name.textContent = k;
-      const v = document.createElement('div'); v.textContent = val.toFixed(2);
+      const v = document.createElement('div'); 
+      v.innerHTML = `${val.toFixed(2)} <small class="mean-label">(avg: ${meanVal.toFixed(2)})</small>`;
       if (val > 0.6) v.className = 'good';
       else if (val > 0.3) v.className = 'low';
       else v.className = 'verylow';
@@ -214,165 +204,96 @@
     });
   }
 
-  function computeMean(arr) {
-      if (arr.length === 0) return 0;
-      return arr.reduce((a, b) => a + b, 0) / arr.length;
-    }
-
-    function computeStd(arr) {
-      if (arr.length < 2) return 0;
-      const m = computeMean(arr);
-      const variance = arr.reduce((a, b) => a + Math.pow(b - m, 2), 0) / (arr.length - 1);
-      return Math.sqrt(variance);
-    }
-
-    function computeMin(arr) {
-      if (arr.length === 0) return 0;
-      return Math.min(...arr);
-    }
-
-    function computeMax(arr) {
-      if (arr.length === 0) return 0;
-      return Math.max(...arr);
-    }
-
-    function computeMedian(arr) {
-      if (arr.length === 0) return 0;
-      const sorted = [...arr].sort((a, b) => a - b);
-      const mid = Math.floor(sorted.length / 2);
-      return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
-    }
-
-    function computeSkewness(arr) {
-      if (arr.length < 2) return 0;
-      const m = computeMean(arr);
-      const s = computeStd(arr);
-      if (s === 0) return 0;
-      const n = arr.length;
-      const skew = arr.reduce((a, b) => a + Math.pow(b - m, 3), 0) / n;
-      return skew / Math.pow(s, 3);
-    }
-
-    function computeKurtosis(arr) {
-      if (arr.length < 2) return 0;
-      const m = computeMean(arr);
-      const s = computeStd(arr);
-      if (s === 0) return 0;
-      const n = arr.length;
-      const kurt = arr.reduce((a, b) => a + Math.pow(b - m, 4), 0) / n;
-      return (kurt / Math.pow(s, 4)) - 3; // Excess kurtosis
-    }
+  function computeMean(arr){ return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0; }
+  function computeStd(arr){ if(arr.length<2) return 0; const m=computeMean(arr); return Math.sqrt(arr.reduce((a,b)=>a+Math.pow(b-m,2),0)/(arr.length-1)); }
+  function computeMin(arr){ return arr.length ? Math.min(...arr) : 0; }
+  function computeMax(arr){ return arr.length ? Math.max(...arr) : 0; }
+  function computeMedian(arr){ if(!arr.length) return 0; const s=[...arr].sort((a,b)=>a-b); const m=Math.floor(s.length/2); return s.length%2? s[m] : (s[m-1]+s[m])/2; }
+  function computeSkewness(arr){ if(arr.length<2) return 0; const m=computeMean(arr), s=computeStd(arr); if(s===0) return 0; const n=arr.length; return arr.reduce((a,b)=>a+Math.pow(b-m,3),0)/n/Math.pow(s,3); }
+  function computeKurtosis(arr){ if(arr.length<2) return 0; const m=computeMean(arr), s=computeStd(arr); if(s===0) return 0; const n=arr.length; return arr.reduce((a,b)=>a+Math.pow(b-m,4),0)/n/Math.pow(s,4)-3; }
 
   startBtn.onclick = function() {
     startBtn.disabled = true;
     stopBtn.disabled = false;
-
     let count = 3;
     countdownDiv.textContent = count;
-
     const countdownInterval = setInterval(() => {
       count--;
-      if (count > 0) {
-        countdownDiv.textContent = count;
-      } else if (count === 0) {
-        countdownDiv.textContent = "Start!";
-      } else {
-        clearInterval(countdownInterval);
-        countdownDiv.textContent = "";
-        
-        // Start recording after countdown
-        startRecording();
-      }
+      if (count > 0) countdownDiv.textContent = count;
+      else if (count === 0) countdownDiv.textContent = "Start!";
+      else { clearInterval(countdownInterval); countdownDiv.textContent = ""; startRecording(); }
     }, 1000);
   };
 
-  // Separate the async recording function
   async function startRecording() {
-    // Create a timestamp for both files
     sessionTimestamp = new Date().toISOString().replace(/[:.]/g, '-');
-
-    // Request video + audio
-    const constraints = { 
-      video: { width: 640, height: 480, facingMode: facing.value },
-      audio: true
-    };
-
+    const constraints = { video: { width: 640, height: 480, facingMode: facing.value }, audio: true };
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     video.srcObject = stream;
-    video.muted = true; // prevent echo
-    await video.play();
+    video.muted = true; await video.play();
 
-    // Set up MediaRecorder for raw video+audio
     recordedChunks = [];
     mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
-
-    mediaRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) recordedChunks.push(e.data);
-    };
-
+    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
     mediaRecorder.onstop = () => {
       const blob = new Blob(recordedChunks, { type: 'video/webm' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `session_${sessionTimestamp}.webm`;
-      a.click();
+      const a = document.createElement('a'); a.href = url; a.download = `session_${sessionTimestamp}.webm`; a.click();
       URL.revokeObjectURL(url);
     };
-
     mediaRecorder.start();
 
-    // Start the AU tracking camera
-    camera = new Camera(video, { 
-      onFrame: async () => { await faceMesh.send({image: video}); }, 
-      width: 640, height: 480 
-    });
+    camera = new Camera(video, { onFrame: async () => { await faceMesh.send({image: video}); }, width: 640, height: 480 });
     camera.start();
 
-    // Fixed AU column order
     const auOrder = ['timestamp','AU1','AU2','AU4','AU6','AU7','AU9','AU10','AU12','AU14','AU15','AU17','AU20','AU23','AU25','AU26','AU45','iod'];
     csvRows = [auOrder.join(',')];
+    auHistory = {}; auOrder.slice(1).forEach(k => { auHistory[k] = []; });
 
     samplingInterval = setInterval(()=> {
       if (lastAUs){
-        csvRows.push([
-          new Date().toISOString(), 
-          ...auOrder.slice(1).map(k => lastAUs[k]?.toFixed(3) ?? '0.000')
-        ].join(','));
+        auOrder.slice(1).forEach(k => auHistory[k].push(lastAUs[k] ?? 0));
+        csvRows.push([ new Date().toISOString(), ...auOrder.slice(1).map(k => lastAUs[k]?.toFixed(3) ?? '0.000') ].join(','));
       }
     }, 500);
   }
 
   stopBtn.onclick = () => {
-    if (camera) {
-      camera.stop();
-      camera = null;
-    }
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-      mediaRecorder.stop();
-    }
-    if (samplingInterval) {
-      clearInterval(samplingInterval);
-      samplingInterval = null;
-    }
-    if (video.srcObject) {
-      video.srcObject.getTracks().forEach(track => track.stop());
-      video.srcObject = null;
-    }
-    startBtn.disabled = false;
-    stopBtn.disabled = true;
+    if (camera) camera.stop();
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    if (samplingInterval) clearInterval(samplingInterval);
+    if (video.srcObject) { video.srcObject.getTracks().forEach(track => track.stop()); video.srcObject = null; }
+    startBtn.disabled = false; stopBtn.disabled = true;
   };
 
   downloadBtn.onclick = () => {
     if (csvRows.length > 1) {
       const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `au_data_${sessionTimestamp}.csv`;
-      a.click();
+      const a = document.createElement('a'); a.href = url; a.download = `au_data_${sessionTimestamp}.csv`; a.click();
       URL.revokeObjectURL(url);
     }
+  };
+
+  summaryBtn.onclick = () => {
+    const summaryRows = ["AU,Mean,Std,Min,Max,Median,Skewness,Kurtosis"];
+    Object.keys(auHistory).forEach(au => {
+      const vals = auHistory[au];
+      summaryRows.push([
+        au,
+        computeMean(vals).toFixed(4),
+        computeStd(vals).toFixed(4),
+        computeMin(vals).toFixed(4),
+        computeMax(vals).toFixed(4),
+        computeMedian(vals).toFixed(4),
+        computeSkewness(vals).toFixed(4),
+        computeKurtosis(vals).toFixed(4)
+      ].join(","));
+    });
+    const blob = new Blob([summaryRows.join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = `au_summary_${sessionTimestamp}.csv`; a.click();
+    URL.revokeObjectURL(url);
   };
 })();
 </script>
